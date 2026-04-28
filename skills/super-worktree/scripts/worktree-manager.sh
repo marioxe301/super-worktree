@@ -1,186 +1,159 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# super-worktree - git worktree manager with env file copying, node_modules
+# symlinking, AI tool detection, and detached terminal spawn.
 set -euo pipefail
 
-GIT_ROOT=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -n 1)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/util.sh
+source "$SCRIPT_DIR/lib/util.sh"
+# shellcheck source=lib/config.sh
+source "$SCRIPT_DIR/lib/config.sh"
+# shellcheck source=lib/spawn.sh
+source "$SCRIPT_DIR/lib/spawn.sh"
+# shellcheck source=lib/sync.sh
+source "$SCRIPT_DIR/lib/sync.sh"
+
+_resolve_git_root() {
+  local toplevel bare_dir
+  toplevel="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$toplevel" ]]; then
+    printf '%s' "$toplevel"
+    return 0
+  fi
+  if [[ "$(git rev-parse --is-bare-repository 2>/dev/null || echo false)" == "true" ]]; then
+    bare_dir="$(git rev-parse --git-dir 2>/dev/null || true)"
+    if [[ -n "$bare_dir" ]]; then
+      ( cd "$bare_dir" && pwd )
+      return 0
+    fi
+  fi
+  return 1
+}
+
+GIT_ROOT="$(_resolve_git_root || true)"
+[[ -z "$GIT_ROOT" ]] && die "not inside a git repository"
 WORKTREE_DIR="$GIT_ROOT/.worktrees"
+META_DIR="$WORKTREE_DIR/.metadata"
+
+DRY_RUN="${DRY_RUN:-0}"
+NO_SPAWN="${NO_SPAWN:-0}"
+PRINT_CD="${PRINT_CD:-0}"
+JSON_OUT="${JSON_OUT:-0}"
+
 WORKTREE_CREATED=0
 BRANCH_NAME=""
 
-cleanup() {
-  if [[ "$WORKTREE_CREATED" -eq 1 && -n "$BRANCH_NAME" ]]; then
+cleanup_on_err() {
+  if [[ "$WORKTREE_CREATED" -eq 1 && -n "$BRANCH_NAME" && "$DRY_RUN" -eq 0 ]]; then
+    warn "rolling back partial worktree '$BRANCH_NAME'"
     git worktree remove --force "$WORKTREE_DIR/$BRANCH_NAME" 2>/dev/null || true
+    rm -f "$META_DIR/$BRANCH_NAME.json"
   fi
 }
-trap cleanup ERR EXIT
+trap cleanup_on_err ERR
 
 usage() {
   cat <<EOF
-super-worktree - Git worktree manager with env file copying and node_modules symlinking
+super-worktree v$SUPER_WORKTREE_VERSION
 
 Usage:
-  $(basename "$0") create <branch> [from-branch] [--config <file>]
+  $(basename "$0") create <branch> [from-branch] [options]
   $(basename "$0") delete <branch>
-  $(basename "$0") merge <branch>
+  $(basename "$0") merge  <branch>
+  $(basename "$0") sync   <branch>
+  $(basename "$0") list   [--json]
+  $(basename "$0") status [--json]
+  $(basename "$0") prune
+  $(basename "$0") version
   $(basename "$0") help
 
-Commands:
-  create <branch> [from-branch] [--config <file>]
-    Create a new worktree for <branch> from [from-branch] (defaults to origin/HEAD or main)
-    --config <file>  Use custom config file
+Create options:
+  --config <file>     Custom config JSON
+  --tool <name>       Force AI tool (claude, opencode, codex, ...)
+  --ide <name>        Open IDE instead of AI tool (code, cursor, idea)
+  --ticket <id>       Ticket id for branch templating (e.g. WFL-1234)
+  --slug <text>       Slug for branch templating (kebab-cased)
+  --from-pr <num>     Check out a GitHub PR (requires gh)
+  --no-spawn          Skip terminal spawn
+  --print-cd          Print 'cd <path>' line to stdout (for shell eval)
+  --dry-run           Print intended actions; make no changes
 
-  delete <branch>
-    Remove worktree for <branch>
-
-  merge <branch>
-    Merge branch and remove worktree (cleanup)
-
-  help
-    Show this help message
-
-Examples:
-  $(basename "$0") create feature/new-login
-  $(basename "$0") create feature/payments --config .super-worktree.json
-  $(basename "$0") delete feature/new-login
-  $(basename "$0") merge feature/new-login
-
+Environment:
+  SUPER_WORKTREE_TOOL  Override AI tool detection
+  TRUST_DIRENV=1       Auto-run 'direnv allow' on copied .envrc
 EOF
 }
 
-load_config() {
-  local custom_config="${1:-}"
-  local config_file=""
-  local copyFiles=()
-  local symlinkDirs=()
-  local exclude=()
-
-  # Default patterns
-  copyFiles=(".env" ".env.*" ".envrc" ".local.*" "*.secret" "*.key" ".secrets.*" "credentials.json" "credentials.yml" "credentials.env" "auth.json" "auth.yml" "auth.env" ".dev.vars" ".prod.vars" ".staging.vars")
-  symlinkDirs=("node_modules")
-  exclude=("node_modules" ".git" "dist" "build" ".next" "out" "coverage" ".turbo" ".vercel" ".worktrees")
-
-  # Try to load jq first, fallback to python3
-  have_jq=false
-  if command -v jq &> /dev/null; then
-    have_jq=true
+ensure_local_exclude() {
+  local exclude_file="$GIT_ROOT/.git/info/exclude"
+  mkdir -p "$(dirname "$exclude_file")"
+  touch "$exclude_file"
+  if ! grep -qxF '.worktrees/' "$exclude_file" 2>/dev/null; then
+    [[ "$DRY_RUN" -eq 0 ]] && printf '%s\n' '.worktrees/' >> "$exclude_file"
+    log "ensured .worktrees/ in .git/info/exclude"
   fi
+}
 
-  # Load global config
-  global_config="$HOME/.config/super-worktree/config.json"
-  if [[ -f "$global_config" ]]; then
-    if $have_jq; then
-      local global_copy
-      global_copy=$(jq -r '.sync.copyFiles // [] | join(" ")' "$global_config" 2>/dev/null || echo "")
-      if [[ -n "$global_copy" ]]; then
-        read -ra copyFiles <<< "$global_copy"
-      fi
-    else
-      # python3 fallback for global
-      python3 -c "
-import json
-import sys
-try:
-    with open('$global_config') as f:
-        cfg = json.load(f)
-        if 'sync' in cfg and 'copyFiles' in cfg['sync']:
-            print(' '.join(cfg['sync']['copyFiles']))
-except Exception:
-    pass
-" 2>/dev/null || true
-    fi
-  fi
+write_metadata() {
+  local branch="$1" base="$2" tool="$3"
+  [[ "$DRY_RUN" -eq 1 ]] && return 0
+  local out="$META_DIR/$branch.json"
+  mkdir -p "$(dirname "$out")"
+  cat > "$out" <<EOF
+{"baseBranch":"$base","createdAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","aiTool":"$tool"}
+EOF
+}
 
-  # Load project config
-  project_config="$GIT_ROOT/.super-worktree.json"
-  if [[ -f "$project_config" ]]; then
-    if $have_jq; then
-      local project_copy project_symlink project_exclude
-      project_copy=$(jq -r '.sync.copyFiles // [] | join(" ")' "$project_config" 2>/dev/null || echo "")
-      project_symlink=$(jq -r '.sync.symlinkDirs // [] | join(" ")' "$project_config" 2>/dev/null || echo "")
-      project_exclude=$(jq -r '.sync.exclude // [] | join(" ")' "$project_config" 2>/dev/null || echo "")
-      [[ -n "$project_copy" ]] && read -ra copyFiles <<< "$project_copy"
-      [[ -n "$project_symlink" ]] && read -ra symlinkDirs <<< "$project_symlink"
-      [[ -n "$project_exclude" ]] && read -ra exclude <<< "$project_exclude"
-    else
-      python3 -c "
-import json
-try:
-    with open('$project_config') as f:
-        cfg = json.load(f)
-        if 'sync' in cfg:
-            if 'copyFiles' in cfg['sync']:
-                print(' '.join(cfg['sync']['copyFiles']))
-            if 'symlinkDirs' in cfg['sync']:
-                print(' '.join(cfg['sync']['symlinkDirs']))
-            if 'exclude' in cfg['sync']:
-                print(' '.join(cfg['sync']['exclude']))
-except Exception:
-    pass
-" 2>/dev/null || true
-    fi
-  fi
-
-  # Load custom config (highest priority)
-  if [[ -n "$custom_config" && -f "$custom_config" ]]; then
-    if $have_jq; then
-      local custom_copy custom_symlink custom_exclude
-      custom_copy=$(jq -r '.sync.copyFiles // [] | join(" ")' "$custom_config" 2>/dev/null || echo "")
-      custom_symlink=$(jq -r '.sync.symlinkDirs // [] | join(" ")' "$custom_config" 2>/dev/null || echo "")
-      custom_exclude=$(jq -r '.sync.exclude // [] | join(" ")' "$custom_config" 2>/dev/null || echo "")
-      [[ -n "$custom_copy" ]] && read -ra copyFiles <<< "$custom_copy"
-      [[ -n "$custom_symlink" ]] && read -ra symlinkDirs <<< "$custom_symlink"
-      [[ -n "$custom_exclude" ]] && read -ra exclude <<< "$custom_exclude"
-    else
-      python3 -c "
-import json
-try:
-    with open('$custom_config') as f:
-        cfg = json.load(f)
-        if 'sync' in cfg:
-            if 'copyFiles' in cfg['sync']:
-                print(' '.join(cfg['sync']['copyFiles']))
-            if 'symlinkDirs' in cfg['sync']:
-                print(' '.join(cfg['sync']['symlinkDirs']))
-            if 'exclude' in cfg['sync']:
-                print(' '.join(cfg['sync']['exclude']))
-except Exception:
-    pass
-" 2>/dev/null || true
-    fi
-  fi
-
-  echo "${copyFiles[*]}"
-  echo "${symlinkDirs[*]}"
-  echo "${exclude[*]}"
+_slugify() {
+  local s="$1"
+  s="${s,,}"
+  s="${s// /-}"
+  s="${s//_/-}"
+  s="$(printf '%s' "$s" | tr -cd 'a-z0-9-')"
+  printf '%s' "$s"
 }
 
 cmd_create() {
-  local branch="${1:-}"
-  local from_branch=""
-  local custom_config=""
+  local branch="" from_branch="" custom_config="" cli_tool="" ide="" ticket="" slug="" from_pr=""
 
-  # Parse arguments
-  shift
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --config)
-        custom_config="$2"
-        shift 2
-        ;;
+      --config)    custom_config="$2"; shift 2 ;;
+      --tool)      cli_tool="$2";      shift 2 ;;
+      --ide)       ide="$2";           shift 2 ;;
+      --ticket)    ticket="$2";        shift 2 ;;
+      --slug)      slug="$2";          shift 2 ;;
+      --from-pr)   from_pr="$2";       shift 2 ;;
+      --no-spawn)  NO_SPAWN=1;         shift   ;;
+      --print-cd)  PRINT_CD=1;         shift   ;;
+      --dry-run)   DRY_RUN=1;          shift   ;;
+      -*)          die "unknown flag: $1" ;;
       *)
-        if [[ -z "$from_branch" ]]; then
-          from_branch="$1"
+        if   [[ -z "$branch"      ]]; then branch="$1"
+        elif [[ -z "$from_branch" ]]; then from_branch="$1"
+        else die "unexpected arg: $1"
         fi
         shift
         ;;
     esac
   done
 
-  if [[ -z "$branch" ]]; then
-    echo "Error: branch name required" >&2
-    exit 1
+  if [[ -n "$ticket" || -n "$slug" ]]; then
+    [[ -z "$branch" ]] || die "cannot combine positional <branch> with --ticket/--slug"
+    branch="${ticket:+${ticket,,}}"
+    [[ -n "$slug" ]] && branch="${branch:+$branch-}$(_slugify "$slug")"
   fi
 
-  # Determine base branch
+  if [[ -n "$from_pr" ]]; then
+    require_cmd gh "Install GitHub CLI (https://cli.github.com) to use --from-pr"
+    [[ -z "$branch" ]] && branch="pr-$from_pr"
+    log "Fetching PR #$from_pr ref via gh..."
+    gh pr checkout --detach "$from_pr" >/dev/null 2>&1 || die "gh pr checkout failed for #$from_pr"
+    from_branch="HEAD"
+  fi
+
+  validate_branch_name "$branch"
+
   local base_ref="${from_branch:-}"
   if [[ -z "$base_ref" ]]; then
     if git rev-parse -q --verify origin/HEAD &>/dev/null; then
@@ -189,288 +162,262 @@ cmd_create() {
       base_ref="main"
     fi
   fi
+  git rev-parse -q --verify "$base_ref" &>/dev/null \
+    || die "base ref '$base_ref' does not exist"
 
-  # Verify base ref exists
-  if ! git rev-parse -q --verify "$base_ref" &>/dev/null; then
-    echo "Error: base branch '$base_ref' does not exist" >&2
-    exit 1
-  fi
-
-  # Check if worktree already exists
   if [[ -d "$WORKTREE_DIR/$branch" ]]; then
-    echo "Error: worktree '$branch' already exists at '$WORKTREE_DIR/$branch'" >&2
-    exit 1
+    die "worktree '$branch' already exists at '$WORKTREE_DIR/$branch'"
+  fi
+  if git worktree list --porcelain | awk '/^branch /{print $2}' | grep -qx "refs/heads/$branch"; then
+    die "branch '$branch' already has a worktree"
   fi
 
-  # Abort if branch already has a worktree elsewhere
-  if git worktree list --porcelain | grep -q "worktree $branch$"; then
-    echo "Error: branch '$branch' already has a worktree" >&2
-    exit 1
+  load_config "$custom_config"
+
+  log "Creating worktree '$branch' from '$base_ref'..."
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "(dry-run) would: git worktree add -b $branch $WORKTREE_DIR/$branch $base_ref"
+    log "(dry-run) copyFiles=${COPY_FILES[*]}"
+    log "(dry-run) symlinkDirs=${SYMLINK_DIRS[*]}"
+    log "(dry-run) hooks=${!HOOKS[*]}"
+    return 0
   fi
 
-  echo "Creating worktree for branch '$branch' from '$base_ref'..."
+  ensure_local_exclude
 
-  # Create worktrees directory
+  run_hook preCreate "BRANCH=$branch" "BASE=$base_ref" "WORKTREE_PATH=$WORKTREE_DIR/$branch"
+
   mkdir -p "$WORKTREE_DIR"
-
-  # Ensure .gitignore has worktrees entry
-  ensure_gitignore
-
-  # Create the worktree
   git worktree add -b "$branch" "$WORKTREE_DIR/$branch" "$base_ref"
   WORKTREE_CREATED=1
   BRANCH_NAME="$branch"
 
-  echo "Worktree created at '$WORKTREE_DIR/$branch'"
-
-  # Load config
-  local config_result
-  config_result=$(load_config "$custom_config")
-  local copyFiles symlinkDirs exclude
-  copyFiles=$(echo "$config_result" | sed -n '1p')
-  symlinkDirs=$(echo "$config_result" | sed -n '2p')
-  exclude=$(echo "$config_result" | sed -n '3p')
-
-  # Copy sensitive files
-  copy_sensitive_files "$WORKTREE_DIR/$branch" "$copyFiles" "$exclude"
-
-  # Symlink node_modules
-  symlink_node_modules "$WORKTREE_DIR/$branch" "$symlinkDirs" "$exclude"
-
-  # Trust dev tools
+  copy_sensitive_files "$WORKTREE_DIR/$branch"
+  symlink_node_modules "$WORKTREE_DIR/$branch"
   trust_dev_tools "$GIT_ROOT" "$WORKTREE_DIR/$branch"
 
-  echo "Done! Worktree ready at '$WORKTREE_DIR/$branch'"
-}
+  local resolved_tool
+  resolved_tool=$(detect_ai_tool "$cli_tool")
+  write_metadata "$branch" "$base_ref" "$resolved_tool"
 
-ensure_gitignore() {
-  local gitignore="$GIT_ROOT/.gitignore"
-  local needs_add=false
+  run_hook postCreate "BRANCH=$branch" "BASE=$base_ref" "WORKTREE_PATH=$WORKTREE_DIR/$branch"
 
-  # Check if .gitignore exists
-  if [[ ! -f "$gitignore" ]]; then
-    touch "$gitignore"
-    needs_add=true
+  log ""
+  log "Worktree ready: $WORKTREE_DIR/$branch"
+  print_cd_hint "$WORKTREE_DIR/$branch"
+
+  if [[ -n "$ide" ]]; then
+    spawn_ide "$WORKTREE_DIR/$branch" "$ide"
+  else
+    spawn_terminal "$WORKTREE_DIR/$branch" "$branch" "$cli_tool"
   fi
 
-  # Check if .worktrees is gitignored
-  if ! git check-ignore -q "$WORKTREE_DIR" 2>/dev/null; then
-    echo ".worktrees/" >> "$gitignore"
-    needs_add=true
-  fi
-
-  if [[ "$needs_add" == "true" ]] && git rev-parse -q --git-dir &>/dev/null; then
-    # Stage .gitignore if tracked
-    if git ls-files --error-unmatch "$gitignore" &>/dev/null 2>&1; then
-      git add "$gitignore" 2>/dev/null || true
-    fi
-  fi
-}
-
-copy_sensitive_files() {
-  local worktree_path="$1"
-  local copyFiles="$2"
-  local exclude="$3"
-
-  echo "Copying sensitive files..."
-
-  # Convert exclude to array for checking
-  local exclude_arr
-  read -ra exclude_arr <<< "$exclude"
-
-  # Copy files matching patterns
-  for pattern in $copyFiles; do
-    # Handle glob patterns
-    if [[ "$pattern" == *\** ]]; then
-      while IFS= read -r -d '' file; do
-        [[ -z "$file" ]] && continue
-
-        # Check if in excluded directory
-        local should_exclude=false
-        for ex in "${exclude_arr[@]}"; do
-          if [[ "$file" == *"/$ex"* ]] || [[ "$file" == "$ex" ]]; then
-            should_exclude=true
-            break
-          fi
-        done
-
-        if [[ "$should_exclude" == "false" ]]; then
-          local relpath="${file#$GIT_ROOT/}"
-          local dest="$worktree_path/$relpath"
-
-          # Create parent directory
-          mkdir -p "$(dirname "$dest")"
-
-          # Backup existing file
-          if [[ -f "$dest" ]]; then
-            cp "$dest" "$dest.bak"
-          fi
-
-          # Copy the file
-          cp "$file" "$dest"
-          echo "  Copied: $relpath"
-        fi
-      done < <(find "$GIT_ROOT" -maxdepth 1 -name "$pattern" -type f -print0 2>/dev/null)
-    else
-      # Literal filename
-      local file="$GIT_ROOT/$pattern"
-      if [[ -f "$file" ]]; then
-        local relpath="${file#$GIT_ROOT/}"
-        local dest="$worktree_path/$relpath"
-
-        mkdir -p "$(dirname "$dest")"
-
-        if [[ -f "$dest" ]]; then
-          cp "$dest" "$dest.bak"
-        fi
-
-        cp "$file" "$dest"
-        echo "  Copied: $relpath"
-      fi
-    fi
-  done
-}
-
-symlink_node_modules() {
-  local worktree_path="$1"
-  local symlinkDirs="$2"
-  local exclude="$3"
-
-  echo "Setting up symlinked directories..."
-
-  local exclude_arr
-  read -ra exclude_arr <<< "$exclude"
-
-  for dirname in $symlinkDirs; do
-    local source="$GIT_ROOT/$dirname"
-    local target="$worktree_path/$dirname"
-
-    # Check if source exists
-    if [[ ! -d "$source" ]]; then
-      echo "  Skipping $dirname (not in source)"
-      continue
-    fi
-
-    # Remove existing directory if present
-    if [[ -e "$target" ]]; then
-      rm -rf "$target"
-    fi
-
-    # Create relative symlink
-    local relpath
-    relpath=$(realpath --relative-to="$(dirname "$target")" "$source")
-    ln -s "$relpath" "$target"
-    echo "  Symlinked: $dirname"
-  done
-}
-
-trust_dev_tools() {
-  local source_root="$1"
-  local worktree_path="$2"
-
-  # Trust Mise
-  if [[ -f "$source_root/.mise.toml" ]]; then
-    cp "$source_root/.mise.toml" "$worktree_path/.mise.toml" 2>/dev/null || true
-  fi
-
-  # Trust direnv
-  if [[ -f "$source_root/.envrc" ]]; then
-    cp "$source_root/.envrc" "$worktree_path/.envrc" 2>/dev/null || true
-
-    # Add to trust list if direnv is available
-    if command -v direnv &>/dev/null; then
-      direnv allow "$worktree_path" 2>/dev/null || true
-    fi
-  fi
-
-  # Trust .editorconfig
-  if [[ -f "$source_root/.editorconfig" ]]; then
-    cp "$source_root/.editorconfig" "$worktree_path/.editorconfig" 2>/dev/null || true
-  fi
+  WORKTREE_CREATED=0
 }
 
 cmd_delete() {
-  local branch="$1"
-
-  if [[ -z "$branch" ]]; then
-    echo "Error: branch name required" >&2
-    exit 1
-  fi
+  local branch="${1:-}"
+  validate_branch_name "$branch"
 
   local worktree_path="$WORKTREE_DIR/$branch"
+  [[ -d "$worktree_path" ]] || die "worktree '$branch' does not exist at '$worktree_path'"
 
-  if [[ ! -d "$worktree_path" ]]; then
-    echo "Error: worktree '$branch' does not exist at '$worktree_path'" >&2
-    exit 1
+  load_config ""
+
+  local meta="$META_DIR/$branch.json"
+  local base_branch="main"
+  if [[ -f "$meta" ]] && command -v jq &>/dev/null; then
+    base_branch=$(jq -r '.baseBranch // "main"' "$meta" 2>/dev/null || echo "main")
   fi
 
-  echo "Removing worktree for '$branch'..."
-  git worktree remove --force "$worktree_path"
-  echo "Done!"
+  run_hook preDelete "BRANCH=$branch" "WORKTREE_PATH=$worktree_path"
+
+  log "Removing worktree for '$branch'..."
+  git worktree remove --force "$worktree_path" 2>/dev/null || true
+  rm -f "$meta"
+
+  run_hook postDelete "BRANCH=$branch" "BASE=$base_branch"
+
+  log ""
+  log "========================================"
+  log "Worktree deleted. Base branch: $base_branch"
+  log "========================================"
 }
 
 cmd_merge() {
-  local branch="$1"
-
-  if [[ -z "$branch" ]]; then
-    echo "Error: branch name required" >&2
-    exit 1
-  fi
+  local branch="${1:-}"
+  validate_branch_name "$branch"
 
   local worktree_path="$WORKTREE_DIR/$branch"
+  [[ -d "$worktree_path" ]] || die "worktree '$branch' does not exist"
 
-  if [[ ! -d "$worktree_path" ]]; then
-    echo "Error: worktree '$branch' does not exist" >&2
-    exit 1
-  fi
-
-  # Determine upstream branch
   local upstream
   upstream=$(git rev-parse --abbrev-ref "$branch@{upstream}" 2>/dev/null || echo "")
 
   if [[ -n "$upstream" ]]; then
-    echo "Merging '$branch' into '$upstream'..."
+    log "Merging '$branch' into '$upstream'..."
     git checkout "$upstream"
-    git merge "$branch"
+    git merge --no-ff "$branch"
   else
-    echo "Warning: no upstream branch configured for '$branch'"
-    echo "Manual merge required"
+    warn "no upstream configured for '$branch'; manual merge required"
   fi
 
-  # Remove worktree
-  echo "Removing worktree for '$branch'..."
+  log "Removing worktree for '$branch'..."
   git worktree remove --force "$worktree_path"
-  echo "Done!"
+  rm -f "$META_DIR/$branch.json"
+  log "Done."
 }
 
-# Main command routing
-main() {
-  local command="${1:-}"
+# Yields lines: "<branch>\t<path>" for worktrees under $WORKTREE_DIR.
+_iter_worktrees() {
+  git worktree list --porcelain 2>/dev/null | awk -v root="$WORKTREE_DIR" '
+    /^worktree /        { path=$2; next }
+    /^branch refs\/heads\// {
+      sub("refs/heads/", "", $2); branch=$2
+      if (index(path, root)==1) printf "%s\t%s\n", branch, path
+    }
+  '
+}
 
-  case "$command" in
-    create)
-      shift
-      cmd_create "$@"
-      ;;
-    delete)
-      shift
-      cmd_delete "$@"
-      ;;
-    merge)
-      shift
-      cmd_merge "$@"
-      ;;
-    help|--help|-h)
-      usage
-      ;;
-    "")
-      usage
-      ;;
-    *)
-      echo "Unknown command: $command" >&2
-      usage
-      exit 1
-      ;;
+cmd_list() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) JSON_OUT=1; shift ;;
+      *) die "unknown flag: $1" ;;
+    esac
+  done
+
+  if [[ "$JSON_OUT" -eq 1 ]]; then
+    require_cmd jq "Install jq for --json output"
+    local first=1
+    printf '['
+    while IFS=$'\t' read -r branch path; do
+      [[ -z "$branch" ]] && continue
+      local meta="$META_DIR/$branch.json"
+      local base="null" created="null" tool="null"
+      if [[ -f "$meta" ]]; then
+        base=$(jq '.baseBranch // null'   "$meta")
+        created=$(jq '.createdAt // null' "$meta")
+        tool=$(jq '.aiTool // null'       "$meta")
+      fi
+      [[ $first -eq 0 ]] && printf ','
+      first=0
+      printf '{"branch":%s,"path":%s,"base":%s,"createdAt":%s,"aiTool":%s}' \
+        "$(jq -Rn --arg v "$branch" '$v')" "$(jq -Rn --arg v "$path" '$v')" \
+        "$base" "$created" "$tool"
+    done < <(_iter_worktrees)
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%-40s %-20s %-22s %s\n' BRANCH BASE CREATED TOOL
+  while IFS=$'\t' read -r branch path; do
+    [[ -z "$branch" ]] && continue
+    local meta="$META_DIR/$branch.json"
+    local base="?" created="?" tool="?"
+    if [[ -f "$meta" ]] && command -v jq &>/dev/null; then
+      base=$(jq -r '.baseBranch // "?"' "$meta")
+      created=$(jq -r '.createdAt // "?"' "$meta")
+      tool=$(jq -r '.aiTool // "?"' "$meta")
+    fi
+    printf '%-40s %-20s %-22s %s\n' "$branch" "$base" "$created" "$tool"
+  done < <(_iter_worktrees)
+}
+
+cmd_status() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) JSON_OUT=1; shift ;;
+      *) die "unknown flag: $1" ;;
+    esac
+  done
+
+  if [[ "$JSON_OUT" -eq 1 ]]; then
+    require_cmd jq "Install jq for --json output"
+    local first=1
+    printf '['
+    while IFS=$'\t' read -r branch path; do
+      [[ -z "$branch" ]] && continue
+      local dirty
+      dirty=$(git -C "$path" status --porcelain 2>/dev/null | wc -l)
+      [[ $first -eq 0 ]] && printf ','
+      first=0
+      printf '{"branch":%s,"path":%s,"dirty":%d}' \
+        "$(jq -Rn --arg v "$branch" '$v')" "$(jq -Rn --arg v "$path" '$v')" "$dirty"
+    done < <(_iter_worktrees)
+    printf ']\n'
+    return 0
+  fi
+
+  while IFS=$'\t' read -r branch path; do
+    [[ -z "$branch" ]] && continue
+    local dirty
+    dirty=$(git -C "$path" status --porcelain 2>/dev/null | wc -l)
+    if [[ "$dirty" -gt 0 ]]; then
+      printf '  %-40s [DIRTY: %d file(s)]\n' "$branch" "$dirty"
+    else
+      printf '  %-40s [clean]\n' "$branch"
+    fi
+  done < <(_iter_worktrees)
+}
+
+cmd_sync() {
+  local branch="${1:-}" custom_config=""
+  shift || true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --config) custom_config="$2"; shift 2 ;;
+      *) die "unknown flag: $1" ;;
+    esac
+  done
+  validate_branch_name "$branch"
+
+  local worktree_path="$WORKTREE_DIR/$branch"
+  [[ -d "$worktree_path" ]] || die "worktree '$branch' does not exist"
+
+  load_config "$custom_config"
+
+  log "Re-syncing worktree '$branch'..."
+  copy_sensitive_files "$worktree_path"
+  symlink_node_modules "$worktree_path"
+  trust_dev_tools "$GIT_ROOT" "$worktree_path"
+  log "Sync complete."
+}
+
+cmd_prune() {
+  log "Pruning stale worktrees and metadata..."
+  git worktree prune -v
+  if [[ -d "$META_DIR" ]]; then
+    while IFS= read -r -d '' meta; do
+      local rel branch
+      rel="${meta#"$META_DIR"/}"
+      branch="${rel%.json}"
+      if [[ ! -d "$WORKTREE_DIR/$branch" ]]; then
+        rm -f "$meta"
+        log "  removed orphan metadata: $branch"
+      fi
+    done < <(find "$META_DIR" -type f -name '*.json' -print0 2>/dev/null)
+    find "$META_DIR" -type d -empty -delete 2>/dev/null || true
+  fi
+}
+
+cmd_version() {
+  log "super-worktree $SUPER_WORKTREE_VERSION"
+}
+
+main() {
+  local cmd="${1:-help}"
+  case "$cmd" in
+    create)  shift; cmd_create  "$@" ;;
+    delete)  shift; cmd_delete  "$@" ;;
+    merge)   shift; cmd_merge   "$@" ;;
+    sync)    shift; cmd_sync    "$@" ;;
+    list)    shift; cmd_list    "$@" ;;
+    status)  shift; cmd_status  "$@" ;;
+    prune)   cmd_prune  ;;
+    version|--version|-v) cmd_version ;;
+    help|--help|-h|"")    usage     ;;
+    *) err "unknown command: $cmd"; usage; exit 1 ;;
   esac
 }
 

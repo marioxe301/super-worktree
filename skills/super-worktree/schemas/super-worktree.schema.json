@@ -4,6 +4,11 @@
   "description": "Configuration schema for super-worktree skill that manages git worktrees with env file copying and node_modules symlinking",
   "type": "object",
   "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Config schema version. Current build expects 1.",
+      "const": 1
+    },
     "sync": {
       "type": "object",
       "description": "Synchronization patterns for worktree creation",
@@ -31,7 +36,24 @@
             "type": "string"
           },
           "default": ["node_modules", ".git", "dist", "build", ".next", "out", "coverage", ".turbo", ".vercel", ".worktrees"]
+        },
+        "copyDepth": {
+          "type": "integer",
+          "description": "Max directory depth (find -maxdepth) to scan for copyFiles/symlinkDirs. Use 1 for repo root only, 2+ for monorepo workspaces.",
+          "minimum": 1,
+          "default": 2
         }
+      },
+      "additionalProperties": false
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Shell commands invoked at lifecycle phases. Receive env: BRANCH, BASE, WORKTREE_PATH.",
+      "properties": {
+        "preCreate":  { "type": "string", "description": "Run before git worktree add" },
+        "postCreate": { "type": "string", "description": "Run after sync (e.g. 'pnpm install')" },
+        "preDelete":  { "type": "string", "description": "Run before worktree removal" },
+        "postDelete": { "type": "string", "description": "Run after worktree removal" }
       },
       "additionalProperties": false
     }

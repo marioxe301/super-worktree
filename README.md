@@ -2,7 +2,7 @@
 
 ![super-worktree](./super-worktree.png)
 
-Create isolated git worktrees for parallel feature work with monorepo-aware env file copying and node_modules symlinking.
+Create isolated git worktrees for parallel feature work. Auto-copies env files, symlinks `node_modules`, detects your AI tool, and spawns a detached terminal session that survives the calling shell.
 
 ## Installation
 
@@ -10,121 +10,217 @@ Create isolated git worktrees for parallel feature work with monorepo-aware env 
 npx skills add marioxe301/super-worktree
 ```
 
-Works with Claude Code, OpenCode, Codex, Cursor, Windsurf, Cline, and 40+ AI agents.
+Works with Claude Code, OpenCode, Codex, Cursor, Windsurf, Cline, Aider, and 40+ AI agents.
 
 ## Requirements
 
-- Git 2.5+ (with worktree support)
+- Git 2.5+ (worktree support)
 - Bash 4.0+
-- `jq` - Optional, for JSON config parsing (Python 3 fallback available)
-- `python3` - Optional, fallback JSON parser
+- `jq` (required for JSON config parsing)
+- `gh` (optional, only for `--from-pr`)
 
 ## Features
 
-### Automatic sensitive file copying
+### Sensitive file copying
 
-Automatically copies environment files and credentials to new worktrees:
-
-- `.env`, `.env.*` - Environment files
-- `.envrc` - direnv config
-- `.local.*` - Local overrides
-- `credentials.json`, `credentials.yml` - Credentials
-- `auth.json`, `auth.yml` - Auth config
+Defaults: `.env`, `.env.*`, `.envrc`, `.local.*`, `*.secret`, `*.key`, `.secrets.*`, `credentials.{json,yml,env}`, `auth.{json,yml,env}`, `.dev.vars`, `.prod.vars`, `.staging.vars`. Recurses up to `copyDepth` (default 2) for monorepo workspaces. Negate via `!pattern`.
 
 ### node_modules symlinking
 
-Saves disk space by symlinking dependencies instead of copying.
+Saves disk space. Discovers nested workspace `node_modules` automatically.
 
-### Auto-navigation
+### Detached terminal spawn
 
-Automatically spawns terminals with OpenCode running in the new worktree:
+Opens a new terminal tab/session and auto-runs the detected AI tool. Spawned with `setsid nohup … & disown` so it survives the calling AI session exiting.
 
-- **After create**: Opens new terminal in worktree
-- **After delete**: Opens new terminal in base branch
-- Base branch is stored in `.worktrees/.metadata/`
+| Terminal | Platform | Priority |
+|----------|----------|----------|
+| cmux | all | 1 (when `$CMUX_WORKSPACE_ID` set) |
+| tmux | all | 2 (new window inside session, detached session outside) |
+| zellij | all | 3 (when `$ZELLIJ` set) |
+| WezTerm | all | 4 |
+| Kitty | Linux/macOS | 5 |
+| Ghostty | macOS/Linux | 6 |
+| Alacritty | all | 7 |
+| GNOME Terminal | Linux | 8 |
+| Konsole | Linux | 9 |
+| Windows Terminal (WSL) | Windows | 10 |
+| iTerm2 / Terminal.app | macOS | 11 |
 
-#### Supported Terminals
+Fallback: prints `cd … && <ai_tool>` instructions.
 
-| Terminal    | Platform   | Priority |
-| ----------- | ---------- | -------- |
-| cmux        | All        | 1 (if CMUX_WORKSPACE_ID set) |
-| tmux        | All       | 2        |
-| Warp        | macOS     | 3        |
-| Kitty       | Linux/macOS | 4      |
-| Ghostty     | macOS/Linux | 5      |
-| Alacritty   | All       | 6        |
-| WezTerm     | All       | 7        |
-| GNOME Terminal | Linux  | 8        |
-| iTerm2      | macOS     | 9 (fallback) |
+### AI tool detection
 
-Note: If no supported terminal is found, print instructions to manually run `cd <worktree> && opencode`.
+Precedence: `--tool` flag → `$SUPER_WORKTREE_TOOL` → parent process walk (skips shells, matches `claude`/`opencode`/`codex`/`cursor`/`cline`/`windsurf`/`aider`) → `opencode` fallback.
 
-### Configurable patterns
+### IDE handoff
 
-Override defaults with a `super-worktree.json` file:
+`--ide code|cursor|idea|webstorm|pycharm|zed|subl|nvim|vim` opens the IDE instead of an AI tool.
+
+### Lifecycle hooks
+
+Run shell commands at create/delete phases:
 
 ```json
 {
-  "sync": {
-    "copyFiles": [".env", ".env.local"],
-    "symlinkDirs": ["node_modules", ".pnpm-store"],
-    "exclude": ["dist", "build"]
+  "version": 1,
+  "hooks": {
+    "preCreate":  "echo creating $BRANCH",
+    "postCreate": "pnpm install --frozen-lockfile",
+    "preDelete":  "echo cleaning $BRANCH",
+    "postDelete": "echo done"
   }
 }
 ```
 
+Hooks receive `BRANCH`, `BASE`, `WORKTREE_PATH` env vars.
+
+### Branch templating
+
+```bash
+bash scripts/worktree-manager.sh create --ticket TEST-1 --slug "test feature"
+# → branch: test-1-test-feature
+```
+
+### GitHub PR checkout
+
+```bash
+bash scripts/worktree-manager.sh create --from-pr 123
+```
+
+### Glob negation + env interpolation
+
+```json
+{
+  "sync": {
+    "copyFiles": [".env", ".env.*", "!.env.example", "${HOME}/.aws/credentials"]
+  }
+}
+```
+
+Defaults already negate `.env.example`, `.env.sample`, `.env.template`.
+
+### Local-only ignore
+
+Adds `.worktrees/` to `.git/info/exclude` (not tracked `.gitignore`).
+
+### Metadata tracking
+
+Stored at `.worktrees/.metadata/<branch>.json`:
+
+```json
+{"baseBranch":"main","createdAt":"2026-04-28T20:59:18Z","aiTool":"claude"}
+```
+
 ## Commands
 
-| Command                           | Description               |
-| --------------------------------- | ------------------------- |
-| `create <branch> [from-branch]`     | Create new worktree       |
-| `create <branch> --config <file>`  | Create with custom config |
-| `delete <branch>`                 | Remove worktree           |
-| `merge <branch>`                  | Merge and cleanup         |
+| Command | Description |
+|---------|-------------|
+| `create <branch> [from-branch] [opts]` | Create new worktree |
+| `delete <branch>` | Remove worktree |
+| `merge <branch>` | Merge into upstream and remove |
+| `sync <branch>` | Re-copy env + re-symlink for existing worktree |
+| `list [--json]` | List worktrees with base/created/tool |
+| `status [--json]` | Show clean/dirty per worktree |
+| `prune` | Remove orphan metadata + `git worktree prune` |
+| `version` | Print version |
+| `help` | Show usage |
+
+## Create options
+
+| Flag | Effect |
+|------|--------|
+| `--config <file>` | Custom config JSON |
+| `--tool <name>` | Force AI tool |
+| `--ide <name>` | Open IDE instead of AI tool |
+| `--ticket <id>` | Ticket id for branch templating |
+| `--slug <text>` | Slug for branch templating |
+| `--from-pr <num>` | Check out a GitHub PR (requires `gh`) |
+| `--no-spawn` | Skip terminal spawn |
+| `--print-cd` | Print `cd <path>` to stdout |
+| `--dry-run` | Print intended actions; no changes |
+
+## Environment overrides
+
+| Var | Effect |
+|-----|--------|
+| `SUPER_WORKTREE_TOOL` | Override AI tool detection |
+| `TRUST_DIRENV=1` | Auto-run `direnv allow` on copied `.envrc` |
+| `NO_SPAWN=1` / `DRY_RUN=1` / `PRINT_CD=1` / `JSON_OUT=1` | Equivalent to flags |
 
 ## Examples
 
 ```bash
-# Create from main
-bash scripts/worktree-manager.sh create feature/new-login
+# Create from origin/HEAD
+bash scripts/worktree-manager.sh create feature/login
 
-# Create from develop
-bash scripts/worktree-manager.sh create feature/payments develop
+# Create from develop with custom config
+bash scripts/worktree-manager.sh create feature/payments develop --config .super-worktree.json
 
-# Delete worktree
-bash scripts/worktree-manager.sh delete feature/new-login
+# Templated branch + force claude tool
+bash scripts/worktree-manager.sh create --ticket TEST-1 --slug "test feature" --tool claude
 
-# Merge and cleanup
-bash scripts/worktree-manager.sh merge feature/new-login
+# CI-friendly creation
+bash scripts/worktree-manager.sh create hotfix --no-spawn
+
+# Open in VS Code instead of AI tool
+bash scripts/worktree-manager.sh create feature/ui --ide code
+
+# Eval cd into new worktree
+cd "$(bash scripts/worktree-manager.sh create feat --print-cd --no-spawn | tail -1 | sed 's|^cd ||')"
+
+# Re-pull env after rotation
+bash scripts/worktree-manager.sh sync feature/login
+
+# Machine-readable list
+bash scripts/worktree-manager.sh list --json | jq '.[].branch'
 ```
 
-### Natural Language Usage
+## Natural language usage
 
-You can invoke this skill using natural language prompts with your AI agent:
+Invoke via natural language prompts to your AI agent:
 
-**Creating worktrees:**
-- "Create a new worktree for feature/login"
-- "Set up parallel development for the authentication branch"
-- "I need to work on two features at once"
-- "Start a hotfix worktree from production"
+**Create:**
+- "Create a worktree for feature/login"
+- "Set up a hotfix worktree from production"
+- "Start work on TEST-1 with slug 'test feature'"
 
-**Deleting worktrees:**
-- "Delete the feature/login worktree"
-- "Clean up the payments worktree"
-- "I'm done with this branch, remove the worktree"
+**Delete / sync:**
+- "Delete the payments worktree"
+- "Re-sync env files into the login worktree"
 
 **With specific tools:**
-- "Create a worktree using Claude"
-- "Set up a worktree and open it in OpenCode"
+- "Create a worktree and open it in cursor"
+- "Open feature/ui in VS Code instead"
 
-## Configuration Priority
+## Shell completions
 
-Config is loaded in this order (later overrides earlier):
+```bash
+# bash
+echo 'source /path/to/super-worktree/completions/super-worktree.bash' >> ~/.bashrc
+
+# zsh
+cp completions/_super-worktree /usr/local/share/zsh/site-functions/
+
+# fish
+cp completions/super-worktree.fish ~/.config/fish/completions/
+```
+
+## Configuration priority
 
 1. Built-in defaults
-2. Global config: `~/.config/super-worktree/config.json`
-3. Project config: `.super-worktree.json`
-4. CLI `--config` flag (highest)
+2. Global: `~/.config/super-worktree/config.json`
+3. Project: `.super-worktree.json` or `super-worktree.json`
+4. CLI `--config` (highest)
+
+## Tests
+
+```bash
+bash tests/e2e_smoke.sh      # create/list/status/delete/prune
+bash tests/e2e_features.sh   # templating, negation, sync, --json
+```
+
+CI: `.github/workflows/ci.yml` runs shellcheck + smoke + features on push/PR.
 
 ## License
 

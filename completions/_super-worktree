@@ -1,0 +1,48 @@
+#compdef worktree-manager.sh super-worktree
+# super-worktree zsh completion
+# Place in fpath, e.g. /usr/local/share/zsh/site-functions/
+
+_super_worktree() {
+  local -a commands
+  commands=(
+    'create:create a new worktree'
+    'delete:remove a worktree'
+    'merge:merge branch and remove worktree'
+    'sync:re-copy env and re-symlink for an existing worktree'
+    'list:list all worktrees'
+    'status:show clean/dirty per worktree'
+    'prune:remove orphaned metadata'
+    'version:print version'
+    'help:show usage'
+  )
+
+  if (( CURRENT == 2 )); then
+    _describe 'command' commands
+    return
+  fi
+
+  case "${words[2]}" in
+    delete|merge|sync)
+      local branches
+      branches=(${(f)"$(git for-each-ref --format='%(refname:short)' refs/heads/ 2>/dev/null)"})
+      _describe 'branch' branches
+      ;;
+    create)
+      _arguments \
+        '--config[custom config JSON]:file:_files' \
+        '--tool[force AI tool]:tool:(claude opencode codex cursor cline windsurf aider)' \
+        '--ide[open IDE]:ide:(code cursor windsurf idea webstorm pycharm zed subl nvim vim)' \
+        '--ticket[ticket id]:ticket' \
+        '--slug[slug text]:slug' \
+        '--from-pr[checkout a PR]:pr-number' \
+        '--no-spawn[skip terminal spawn]' \
+        '--print-cd[print cd line]' \
+        '--dry-run[no changes]'
+      ;;
+    list|status)
+      _arguments '--json[machine-readable output]'
+      ;;
+  esac
+}
+
+_super_worktree "$@"
