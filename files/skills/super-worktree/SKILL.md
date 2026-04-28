@@ -152,6 +152,40 @@ The skill includes sensible defaults that cover most projects:
 ### exclude (not copied or symlinked)
 - `node_modules`, `.git`, `dist`, `build`, `.next`, `out`, `coverage`, `.turbo`, `.vercel`, `.worktrees`
 
+## Auto-navigation
+
+Automatically spawns terminals with OpenCode running in the new worktree after worktree creation.
+
+### How it works
+
+- **After create**: Opens new terminal in the worktree with OpenCode running
+- **After delete**: Opens new terminal in the base branch (stored during creation)
+- Base branch is stored in `.worktrees/.metadata/` for persistence across sessions
+
+### Supported Terminals
+
+Terminals are tried in priority order. The first available terminal is used:
+
+| Terminal    | Platform   | Priority |
+| ----------- | ---------- | -------- |
+| cmux        | All        | 1 (if CMUX_WORKSPACE_ID set) |
+| tmux        | All       | 2        |
+| Warp        | macOS     | 3        |
+| Kitty       | Linux/macOS | 4      |
+| Ghostty     | macOS/Linux | 5      |
+| Alacritty   | All       | 6        |
+| WezTerm     | All       | 7        |
+| GNOME Terminal | Linux  | 8        |
+| iTerm2      | macOS     | 9 (fallback) |
+
+### Fallback
+
+If no supported terminal is found, the script prints instructions to manually run:
+
+```bash
+cd <worktree> && opencode
+```
+
 ## Troubleshooting
 
 ### "worktree already exists"
