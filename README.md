@@ -4,22 +4,6 @@
 
 Create isolated git worktrees for parallel feature work with monorepo-aware env file copying and node_modules symlinking.
 
-## Quickstart
-
-```bash
-# Clone or navigate to your repo
-cd my-project
-
-# Create a feature branch worktree
-bash scripts/worktree-manager.sh create feature/my-feature
-
-# Work on your feature...
-# Edit code, run tests, etc.
-
-# When done, merge and cleanup
-bash scripts/worktree-manager.sh merge feature/my-feature
-```
-
 ## Installation
 
 Choose your platform below:
