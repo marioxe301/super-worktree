@@ -1,6 +1,8 @@
 {
-  "name": "Super Worktree",
-  "author": "marioxe301",
+  "name": "super-worktree",
+  "owner": {
+    "name": "marioxe301"
+  },
   "plugins": [
     {
       "name": "super-worktree",
