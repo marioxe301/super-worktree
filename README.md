@@ -1,5 +1,7 @@
 # super-worktree
 
+![super-worktree](./super-worktree.png)
+
 Create isolated git worktrees for parallel feature work with monorepo-aware env file copying and node_modules symlinking.
 
 ## Quickstart
