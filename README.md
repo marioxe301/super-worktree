@@ -22,15 +22,43 @@ bash scripts/worktree-manager.sh merge feature/my-feature
 
 ## Installation
 
-### Using npx skills add
+Choose your platform below:
+
+### OpenCode (recommended via OCX)
 
 ```bash
-npx skills add owner/super-worktree
+# Install via OCX registry (recommended)
+ocx add marioxe301/super-worktree --from https://marioxe301.github.io/super-worktree
+
+# Or clone and install manually
+git clone https://github.com/marioxe301/super-worktree.git
+cp -r super-worktree ~/.config/opencode/skills/
 ```
 
-> **Note**: This command is available when the skill is published to npm or installed in your skills directory.
+### Claude Code
 
-### Manual installation
+```bash
+# Using Claude marketplace (recommended)
+/plugin install marioxe301/super-worktree
+
+# Or using npx skills
+npx skills add marioxe301/super-worktree -a claude-code
+```
+
+### Other AI Agents (Cursor, Codex, etc.)
+
+```bash
+# Using npx skills (recommended for all agents)
+npx skills add marioxe301/super-worktree
+
+# Install to specific agents
+npx skills add marioxe301/super-worktree -a codex -a cursor -a windsurf
+
+# Install globally to all supported agents
+npx skills add marioxe301/super-worktree --all
+```
+
+### Manual Installation
 
 ```bash
 # Find your skills directory

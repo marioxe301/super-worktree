@@ -220,40 +220,30 @@ bash scripts/worktree-manager.sh create <branch>
 
 ## Installation
 
-### OpenCode (recommended via OCX)
+### Using npx (recommended)
 
 ```bash
-# Install via OCX registry (recommended)
-ocx add marioxe301/super-worktree --from https://marioxe301.github.io/super-worktree
+npx skills add owner/super-worktree
+```
 
-# Or manual copy
+Note: This requires the skill to be published to npm or available in your skills directory.
+
+### Manual installation
+
+Copy the skill files to your skills directory:
+
+```bash
+# Find your skills directory
+ls -la ~/.config/opencode/skills/
+
+# Copy files
 cp -r super-worktree ~/.config/opencode/skills/
 ```
 
-### Claude Code
+### Verify installation
 
 ```bash
-# Claude marketplace
-/plugin install marioxe301/super-worktree
-
-# Or npx skills
-npx skills add marioxe301/super-worktree -a claude-code
-```
-
-### Other AI Agents
-
-```bash
-# npx skills works with Codex, Cursor, Windsurf, Cline, and 40+ agents
-npx skills add marioxe301/super-worktree
-
-# Install to specific agents
-npx skills add marioxe301/super-worktree -a codex -a cursor
-```
-
-### Manual
-
-```bash
-cp -r super-worktree ~/.config/opencode/skills/
+bash scripts/worktree-manager.sh help
 ```
 
 ## Requirements
@@ -262,3 +252,5 @@ cp -r super-worktree ~/.config/opencode/skills/
 - Bash 4.0+
 - `jq` (optional, for JSON config; Python 3 fallback available)
 - `python3` (optional, for JSON config fallback)
+
+(End of file - total 254 lines)

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ocx.kdco.dev/schemas/v2/registry.json",
+  "name": "Super Worktree",
+  "version": "1.0.0",
+  "author": "marioxe301",
+  "components": [
+    {
+      "name": "super-worktree",
+      "type": "skill",
+      "description": "Create isolated git worktrees for parallel feature work with monorepo-aware env file copying and node_modules symlinking.",
+      "files": [
+        "skills/super-worktree/SKILL.md",
+        "skills/super-worktree/scripts/worktree-manager.sh",
+        "skills/super-worktree/schemas/super-worktree.schema.json"
+      ],
+      "dependencies": []
+    }
+  ]
+}
