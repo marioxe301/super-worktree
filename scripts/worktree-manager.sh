@@ -18,15 +18,16 @@ usage() {
 super-worktree - Git worktree manager with env file copying and node_modules symlinking
 
 Usage:
-  $(basename "$0") create <branch> [from-branch] [--config <file>]
+  $(basename "$0")   create <branch> [from-branch] [--config <file>] [--tool <name>]
   $(basename "$0") delete <branch>
   $(basename "$0") merge <branch>
   $(basename "$0") help
 
 Commands:
-  create <branch> [from-branch] [--config <file>]
+  create <branch> [from-branch] [--config <file>] [--tool <name>]
     Create a new worktree for <branch> from [from-branch] (defaults to origin/HEAD or main)
     --config <file>  Use custom config file
+    --tool <name>    Specify AI tool (claude, opencode, codex, etc.)
 
   delete <branch>
     Remove worktree for <branch>
@@ -153,7 +154,89 @@ except Exception:
   echo "${exclude[*]}"
 }
 
+detect_ai_tool() {
+  local cli_override="${1:-}"
+
+  # Precedence: --tool flag > env var > auto-detect
+  if [[ -n "$cli_override" ]]; then
+    echo "$cli_override"
+    return 0
+  fi
+
+  if [[ -n "${SUPER_WORKTREE_TOOL:-}" ]]; then
+    echo "$SUPER_WORKTREE_TOOL"
+    return 0
+  fi
+
+  # OS-agnostic parent process traversal
+  local pid=$$
+  local max_depth=10
+  local depth=0
+  local known_tools="opencode claude codex cline cursor windsurf"
+  local shell_names="bash zsh fish sh csh tcsh dash ksh mksh nu xonsh elvish pwsh powershell"
+
+  while [[ $depth -lt $max_depth && $pid -gt 1 ]]; do
+    local ppid="" comm=""
+
+    if [[ -f /proc/$pid/status ]]; then
+      # Linux path
+      ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null)
+      if [[ -n "$ppid" && "$ppid" =~ ^[0-9]+$ && "$ppid" -gt 1 ]]; then
+        comm=$(cat /proc/$ppid/comm 2>/dev/null)
+      fi
+    else
+      # macOS/BSD path
+      local ps_output
+      ps_output=$(ps -o ppid=,comm= -p "$pid" 2>/dev/null)
+      if [[ -n "$ps_output" ]]; then
+        ppid=$(echo "$ps_output" | awk '{print $1}')
+        comm=$(echo "$ps_output" | awk '{print $2}')
+      fi
+    fi
+
+    # Validate ppid before proceeding
+    if [[ -z "$ppid" || "$ppid" == "0" || "$ppid" == "1" ]]; then
+      break
+    fi
+
+    # Strip leading dash for login shells (-bash, -zsh, etc.)
+    local normalized_comm="${comm#-}"
+
+    # Check if this is a shell boundary
+    local is_shell=false
+    for shell in $shell_names; do
+      if [[ "$normalized_comm" == "$shell" ]]; then
+        is_shell=true
+        break
+      fi
+    done
+
+    # Only check non-shell processes
+    if [[ "$is_shell" == "false" && -n "$comm" ]]; then
+      for tool in $known_tools; do
+        if [[ "$normalized_comm" == "$tool" ]]; then
+          echo "$tool"
+          return 0
+        fi
+      done
+    fi
+
+    pid=$ppid
+    ((depth++))
+  done
+
+  # Fallback: emit warning and use default
+  echo "Warning: Could not detect AI tool, falling back to opencode" >&2
+  echo "opencode"
+}
+
 spawn_terminal() {
+  local worktree_path="$1"
+  local branch_name="$2"
+  local cli_tool="${3:-}"
+
+  local ai_tool
+  ai_tool=$(detect_ai_tool "$cli_tool")
   local worktree_path="$1"
   local branch_name="$2"
 
@@ -161,7 +244,7 @@ spawn_terminal() {
 
   # cmux workflow
   if [[ -n "${CMUX_WORKSPACE_ID:-}" ]]; then
-    cmux new-workspace "$branch_name" 2>/dev/null && cmux send-surface "cd '$worktree_path' && opencode" 2>/dev/null && return
+    cmux new-workspace "$branch_name" 2>/dev/null && cmux send-surface "cd '$worktree_path' && $ai_tool" 2>/dev/null && return
   fi
 
   # tmux
@@ -181,7 +264,7 @@ spawn_terminal() {
 
   # Ghostty
   if command -v ghostty &>/dev/null; then
-    ghostty -e bash -c "cd '$worktree_path' && opencode" 2>/dev/null && return
+    ghostty -e bash -c "cd '$worktree_path' && $ai_tool" 2>/dev/null && return
   fi
 
   # Alacritty
@@ -209,7 +292,7 @@ spawn_terminal() {
   echo "========================================"
   echo "To enter the worktree, run:"
   echo "  cd $worktree_path"
-  echo "  opencode"
+  echo "  $ai_tool"
   echo "========================================"
 }
 
@@ -217,6 +300,7 @@ cmd_create() {
   local branch="${1:-}"
   local from_branch=""
   local custom_config=""
+  local ai_tool=""
 
   # Parse arguments
   shift
@@ -224,6 +308,10 @@ cmd_create() {
     case "$1" in
       --config)
         custom_config="$2"
+        shift 2
+        ;;
+      --tool)
+        ai_tool="$2"
         shift 2
         ;;
       *)
@@ -316,7 +404,7 @@ cmd_create() {
 
   # Try to spawn terminal
   echo "Attempting to spawn terminal..."
-  spawn_terminal "$WORKTREE_DIR/$branch" "$branch"
+  spawn_terminal "$WORKTREE_DIR/$branch" "$branch" "$ai_tool"
 }
 
 ensure_gitignore() {
