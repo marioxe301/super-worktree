@@ -98,6 +98,25 @@ bash scripts/worktree-manager.sh delete feature/new-login
 bash scripts/worktree-manager.sh merge feature/new-login
 ```
 
+### Natural Language Usage
+
+You can invoke this skill using natural language prompts with your AI agent:
+
+**Creating worktrees:**
+- "Create a new worktree for feature/login"
+- "Set up parallel development for the authentication branch"
+- "I need to work on two features at once"
+- "Start a hotfix worktree from production"
+
+**Deleting worktrees:**
+- "Delete the feature/login worktree"
+- "Clean up the payments worktree"
+- "I'm done with this branch, remove the worktree"
+
+**With specific tools:**
+- "Create a worktree using Claude"
+- "Set up a worktree and open it in OpenCode"
+
 ## Configuration Priority
 
 Config is loaded in this order (later overrides earlier):

@@ -186,6 +186,49 @@ If no supported terminal is found, the script prints instructions to manually ru
 cd <worktree> && opencode
 ```
 
+## Natural Language Usage
+
+You can invoke this skill using natural language prompts:
+
+### Creating worktrees
+
+**"Create a new worktree for feature/login from main"**
+→ Creates worktree for `feature/login` branch based on `main`
+
+**"Set up parallel development for the authentication branch"**
+→ Creates worktree for `feature/authentication` from default base
+
+**"I need to work on two features at once"**
+→ Creates a new worktree so you can switch between branches
+
+**"Start a hotfix worktree from production"**
+→ Creates worktree for `hotfix/urgent` from production branch
+
+**"Create a worktree using Claude"**
+→ Creates worktree and spawns terminal with `claude` (auto-detected)
+
+### Deleting worktrees
+
+**"Delete the feature/login worktree"**
+→ Removes worktree and returns to base branch
+
+**"Clean up the payments worktree"**
+→ Deletes worktree and navigates back to main
+
+**"I'm done with the authentication branch, remove it"**
+→ Deletes worktree and opens terminal in base branch
+
+### Common workflows
+
+**"Switch to a new feature branch without losing my current changes"**
+→ Creates worktree so your current branch stays untouched
+
+**"Work on the bugfix while keeping the main branch open"**
+→ Creates isolated worktree for parallel development
+
+**"Set up a worktree with my custom config"**
+→ Creates worktree using `--config .super-worktree.json`
+
 ## Troubleshooting
 
 ### "worktree already exists"
