@@ -153,6 +153,66 @@ except Exception:
   echo "${exclude[*]}"
 }
 
+spawn_terminal() {
+  local worktree_path="$1"
+  local branch_name="$2"
+
+  # Priority: cmux > tmux > Warp > Kitty > Ghostty > Alacritty > WezTerm > GNOME > iTerm2
+
+  # cmux workflow
+  if [[ -n "${CMUX_WORKSPACE_ID:-}" ]]; then
+    cmux new-workspace "$branch_name" 2>/dev/null && cmux send-surface "cd '$worktree_path' && opencode" 2>/dev/null && return
+  fi
+
+  # tmux
+  if command -v tmux &>/dev/null; then
+    tmux new-window -c "$worktree_path" -n "$branch_name" 2>/dev/null && return
+  fi
+
+  # Warp (macOS)
+  if command -v open &>/dev/null && [[ "$(uname)" == "Darwin" ]]; then
+    open -a Warp "$worktree_path" 2>/dev/null && return
+  fi
+
+  # Kitty
+  if command -v kitty &>/dev/null; then
+    kitty @ launch --type=tab --cwd="$worktree_path" 2>/dev/null && return
+  fi
+
+  # Ghostty
+  if command -v ghostty &>/dev/null; then
+    ghostty -e bash -c "cd '$worktree_path' && opencode" 2>/dev/null && return
+  fi
+
+  # Alacritty
+  if command -v alacritty &>/dev/null; then
+    alacritty --working-directory "$worktree_path" 2>/dev/null && return
+  fi
+
+  # WezTerm
+  if command -v wezterm &>/dev/null; then
+    wezterm cli spawn --cwd "$worktree_path" 2>/dev/null && return
+  fi
+
+  # GNOME Terminal (Linux)
+  if command -v gnome-terminal &>/dev/null; then
+    gnome-terminal --working-directory="$worktree_path" 2>/dev/null && return
+  fi
+
+  # iTerm2 (macOS fallback)
+  if command -v osascript &>/dev/null && [[ "$(uname)" == "Darwin" ]]; then
+    osascript -e 'tell app "iTerm2" to create window with default profile' 2>/dev/null && return
+  fi
+
+  # Fallback: print instructions
+  echo ""
+  echo "========================================"
+  echo "To enter the worktree, run:"
+  echo "  cd $worktree_path"
+  echo "  opencode"
+  echo "========================================"
+}
+
 cmd_create() {
   local branch="${1:-}"
   local from_branch=""
@@ -221,6 +281,11 @@ cmd_create() {
   WORKTREE_CREATED=1
   BRANCH_NAME="$branch"
 
+  # Store base branch for delete navigation
+  local metadata_dir="$GIT_ROOT/.worktrees/.metadata"
+  mkdir -p "$metadata_dir"
+  echo "{\"baseBranch\":\"$base_ref\",\"createdAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$metadata_dir/$branch.json"
+
   echo "Worktree created at '$WORKTREE_DIR/$branch'"
 
   # Load config
@@ -240,7 +305,18 @@ cmd_create() {
   # Trust dev tools
   trust_dev_tools "$GIT_ROOT" "$WORKTREE_DIR/$branch"
 
-  echo "Done! Worktree ready at '$WORKTREE_DIR/$branch'"
+  echo "Worktree created at '$WORKTREE_DIR/$branch'"
+  echo ""
+
+  # Show navigation hint
+  echo "To enter the worktree:"
+  echo "  cd $WORKTREE_DIR/$branch"
+  echo "  opencode"
+  echo ""
+
+  # Try to spawn terminal
+  echo "Attempting to spawn terminal..."
+  spawn_terminal "$WORKTREE_DIR/$branch" "$branch"
 }
 
 ensure_gitignore() {
@@ -404,9 +480,32 @@ cmd_delete() {
     exit 1
   fi
 
+  # Get base branch from metadata
+  local metadata_file="$GIT_ROOT/.worktrees/.metadata/$branch.json"
+  local base_branch="main"
+  if [[ -f "$metadata_file" ]]; then
+    base_branch=$(python3 -c "import json; print(json.load(open('$metadata_file')).get('baseBranch', 'main')" 2>/dev/null) || base_branch="main"
+  fi
+
   echo "Removing worktree for '$branch'..."
-  git worktree remove --force "$worktree_path"
-  echo "Done!"
+  git worktree remove --force "$worktree_path" 2>/dev/null || true
+
+  # Clean up metadata
+  rm -f "$metadata_file"
+
+  echo ""
+  echo "========================================"
+  echo "Worktree deleted"
+  echo ""
+  echo "To return to base branch ($base_branch):"
+  echo "  cd $GIT_ROOT"
+  echo "  git checkout $base_branch"
+  echo "========================================"
+  echo ""
+
+  # Try to spawn terminal in base branch
+  echo "Attempting to spawn terminal in base branch..."
+  spawn_terminal "$GIT_ROOT" "$base_branch"
 }
 
 cmd_merge() {
