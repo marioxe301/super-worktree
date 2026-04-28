@@ -6,57 +6,11 @@ Create isolated git worktrees for parallel feature work with monorepo-aware env 
 
 ## Installation
 
-Choose your platform below:
-
-### OpenCode (recommended via OCX)
-
 ```bash
-# Install via OCX registry (recommended) (Local Project scope)
-ocx add marioxe301/super-worktree --from https://marioxe301.github.io/super-worktree
-
-# or globally install
-ocx add marioxe301/super-worktree --from https://marioxe301.github.io/super-worktree --global
-
-# Or clone and install manually
-git clone https://github.com/marioxe301/super-worktree.git
-cp -r super-worktree ~/.config/opencode/skills/
-```
-
-### Claude Code
-
-```bash
-# Using Claude marketplace (recommended)
-/plugin install marioxe301/super-worktree
-
-# Or using npx skills
-npx skills add marioxe301/super-worktree -a claude-code
-```
-
-### Other AI Agents (Cursor, Codex, etc.)
-
-```bash
-# Using npx skills (recommended for all agents)
 npx skills add marioxe301/super-worktree
-
-# Install to specific agents
-npx skills add marioxe301/super-worktree -a codex -a cursor -a windsurf
-
-# Install globally to all supported agents
-npx skills add marioxe301/super-worktree --all
 ```
 
-### Manual Installation
-
-```bash
-# Find your skills directory
-ls ~/.config/opencode/skills/
-
-# Or create it if needed
-mkdir -p ~/.config/opencode/skills
-
-# Copy this skill
-cp -r /path/to/super-worktree ~/.config/opencode/skills/
-```
+Works with Claude Code, OpenCode, Codex, Cursor, Windsurf, Cline, and 40+ AI agents.
 
 ## Requirements
 
@@ -79,12 +33,7 @@ Automatically copies environment files and credentials to new worktrees:
 
 ### node_modules symlinking
 
-Saves disk space by symlinking dependencies instead of copying:
-
-```bash
-# Instead of 500MB per worktree
-# Each worktree shares the same node_modules
-```
+Saves disk space by symlinking dependencies instead of copying.
 
 ### Configurable patterns
 
@@ -104,8 +53,8 @@ Override defaults with a `super-worktree.json` file:
 
 | Command                           | Description               |
 | --------------------------------- | ------------------------- |
-| `create <branch> [from-branch]`   | Create new worktree       |
-| `create <branch> --config <file>` | Create with custom config |
+| `create <branch> [from-branch]`     | Create new worktree       |
+| `create <branch> --config <file>`  | Create with custom config |
 | `delete <branch>`                 | Remove worktree           |
 | `merge <branch>`                  | Merge and cleanup         |
 
@@ -117,9 +66,6 @@ bash scripts/worktree-manager.sh create feature/new-login
 
 # Create from develop
 bash scripts/worktree-manager.sh create feature/payments develop
-
-# Create from specific branch with custom config
-bash scripts/worktree-manager.sh create hotfix/urgent --config .my-config.json
 
 # Delete worktree
 bash scripts/worktree-manager.sh delete feature/new-login
@@ -140,4 +86,3 @@ Config is loaded in this order (later overrides earlier):
 ## License
 
 MIT
-
