@@ -11,8 +11,11 @@ Choose your platform below:
 ### OpenCode (recommended via OCX)
 
 ```bash
-# Install via OCX registry (recommended)
+# Install via OCX registry (recommended) (Local Project scope)
 ocx add marioxe301/super-worktree --from https://marioxe301.github.io/super-worktree
+
+# or globally install
+ocx add marioxe301/super-worktree --from https://marioxe301.github.io/super-worktree --global
 
 # Or clone and install manually
 git clone https://github.com/marioxe301/super-worktree.git
@@ -99,12 +102,12 @@ Override defaults with a `super-worktree.json` file:
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `create <branch> [from-branch]` | Create new worktree |
+| Command                           | Description               |
+| --------------------------------- | ------------------------- |
+| `create <branch> [from-branch]`   | Create new worktree       |
 | `create <branch> --config <file>` | Create with custom config |
-| `delete <branch>` | Remove worktree |
-| `merge <branch>` | Merge and cleanup |
+| `delete <branch>`                 | Remove worktree           |
+| `merge <branch>`                  | Merge and cleanup         |
 
 ## Examples
 
@@ -137,3 +140,4 @@ Config is loaded in this order (later overrides earlier):
 ## License
 
 MIT
+
