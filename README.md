@@ -26,6 +26,8 @@ Single repo or **multi-repo workspace** — one feature branch can span `api/`, 
 - [Create options](#create-options)
 - [Environment overrides](#environment-overrides)
 - [Examples](#examples)
+  - [Single-repo](#single-repo)
+  - [Workspace (multi-repo)](#workspace-multi-repo)
 - [Natural language usage](#natural-language-usage)
 - [Shell completions](#shell-completions)
 - [Configuration priority](#configuration-priority)
@@ -187,6 +189,8 @@ Stored at `.worktrees/.metadata/<branch>.json`:
 
 ## Examples
 
+### Single-repo
+
 ```bash
 # Create from origin/HEAD
 bash scripts/worktree-manager.sh create feature/login
@@ -211,6 +215,61 @@ bash scripts/worktree-manager.sh sync feature/login
 
 # Machine-readable list
 bash scripts/worktree-manager.sh list --json | jq '.[].branch'
+```
+
+### Workspace (multi-repo)
+
+```bash
+# Auto-discover sibling git repos at parent folder, write workspace config
+cd ~/work/myapp
+bash scripts/worktree-manager.sh workspace init --name myapp
+
+# Coordinated worktrees across api + ui (defaultProjects from config)
+bash scripts/worktree-manager.sh workspace create feat/payments
+
+# Force every declared project, even if defaultProjects narrows the set
+bash scripts/worktree-manager.sh workspace create feat/release --all
+
+# Pick subset explicitly
+bash scripts/worktree-manager.sh workspace create feat/db-only --projects db
+
+# Mixed bases: api from develop, ui from main
+bash scripts/worktree-manager.sh workspace create feat/x --projects api,ui \
+  --per-project-base api=develop,ui=main
+
+# Different branch name per project (align with existing CI branches)
+bash scripts/worktree-manager.sh workspace create feat/checkout \
+  --projects api,ui --branch-override api=feat/checkout-api,ui=feat/checkout-ui
+
+# Templated workspace branch
+bash scripts/worktree-manager.sh workspace create --ticket TEST-42 --slug "rate limiter" --all
+
+# One terminal tab per project instead of unified hub
+bash scripts/worktree-manager.sh workspace create feat/wide --all --spawn-mode tabs
+
+# Bare 'create' at workspace root auto-routes to workspace create
+bash scripts/worktree-manager.sh create feat/payments --projects api,ui
+
+# Per-project clean/dirty across the feature
+bash scripts/worktree-manager.sh workspace status feat/payments
+bash scripts/worktree-manager.sh workspace status feat/payments --json | jq '.[] | select(.dirty>0) | .alias'
+
+# Re-pull env across every project after rotating secrets
+bash scripts/worktree-manager.sh workspace sync feat/payments
+
+# Tear down (refuses if any project is dirty unless --force)
+bash scripts/worktree-manager.sh workspace delete feat/payments
+bash scripts/worktree-manager.sh workspace delete feat/payments --force
+
+# Merge each project's branch into its upstream and clean up
+bash scripts/worktree-manager.sh workspace merge feat/payments
+
+# Workspace overview
+bash scripts/worktree-manager.sh workspace list
+bash scripts/worktree-manager.sh workspace list --json | jq '.features[].feature'
+
+# Drop orphan workspace metadata after manual git surgery
+bash scripts/worktree-manager.sh workspace prune
 ```
 
 ## Natural language usage
