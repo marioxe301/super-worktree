@@ -1,6 +1,6 @@
 ---
 name: super-worktree
-description: Create isolated git worktrees for parallel feature development. Single repo or multi-repo workspace — one feature branch can span api, ui, db, workers, etc. simultaneously. Auto-copies env files, symlinks node_modules, detects AI tool (claude/opencode/codex/cursor/cline/windsurf/aider), spawns detached terminal that survives the calling shell. Trigger when the user asks to: create/spin up/start a worktree or feature branch; work on multiple repos at once; coordinate branches across api+ui or other sibling repos; initialize a multi-repo workspace; sync env files into existing worktrees; delete/merge/list worktrees; check dirty state across projects; open a feature in a specific AI tool or IDE.
+description: "Create isolated git worktrees for parallel feature development. Single repo or multi-repo workspace — one feature branch can span api, ui, db, workers, etc. simultaneously. Auto-copies env files, symlinks node_modules, detects AI tool (claude/opencode/codex/cursor/cline/windsurf/aider), spawns detached terminal that survives the calling shell. Trigger when the user asks to create/spin-up/start a worktree or feature branch, work on multiple repos at once, coordinate branches across api+ui or other sibling repos, initialize a multi-repo workspace, sync env files into existing worktrees, delete/merge/list worktrees, check dirty state across projects, or open a feature in a specific AI tool or IDE."
 ---
 
 # super-worktree

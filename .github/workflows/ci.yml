@@ -6,6 +6,20 @@ on:
   pull_request:
 
 jobs:
+  skill-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate SKILL.md frontmatter
+        run: bash scripts/validate-skills.sh
+      - name: Simulate npx skills discovery
+        run: |
+          npx --yes skills@latest list . 2>&1 | tee /tmp/skills-list.log
+          grep -q 'super-worktree' /tmp/skills-list.log
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:
