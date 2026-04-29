@@ -2,7 +2,7 @@
 # util.sh - shared helpers for super-worktree
 # shellcheck disable=SC2034
 
-SUPER_WORKTREE_VERSION="0.2.0"
+SUPER_WORKTREE_VERSION="0.3.0"
 
 log()  { printf '%s\n' "$*"; }
 warn() { printf 'Warning: %s\n' "$*" >&2; }

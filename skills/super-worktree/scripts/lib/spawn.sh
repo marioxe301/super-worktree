@@ -179,6 +179,29 @@ EOF
   return 0
 }
 
+# spawn_terminal_workspace <hub_path> <feature> <mode> <records> [cli_tool]
+# mode: "single" (one tab at hub) or "tabs" (one tab per project).
+# records: newline-separated "alias|branch|base|wpath".
+spawn_terminal_workspace() {
+  local hub="$1" feature="$2" mode="$3" records="$4" cli_tool="${5:-}"
+
+  if [[ "${NO_SPAWN:-0}" == "1" ]]; then
+    log "(--no-spawn) skipping terminal launch"
+    return 0
+  fi
+
+  if [[ "$mode" == "tabs" ]]; then
+    local alias branch base wpath
+    while IFS='|' read -r alias branch base wpath; do
+      [[ -z "$alias" ]] && continue
+      spawn_terminal "$wpath" "$feature-$alias" "$cli_tool"
+    done <<< "$records"
+    return 0
+  fi
+
+  spawn_terminal "$hub" "$feature" "$cli_tool"
+}
+
 # spawn_ide <worktree_path> <ide>
 # ide ∈ {code, cursor, windsurf, idea, webstorm, pycharm, zed, subl, nvim, vim}
 spawn_ide() {

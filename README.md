@@ -4,6 +4,35 @@
 
 Create isolated git worktrees for parallel feature work. Auto-copies env files, symlinks `node_modules`, detects your AI tool, and spawns a detached terminal session that survives the calling shell.
 
+Single repo or **multi-repo workspace** — one feature branch can span `api/`, `ui/`, `db/`, etc. simultaneously, with one AI session at a unified workspace root. See [docs/workspace.md](./docs/workspace.md).
+
+## Contents
+
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Features](#features)
+  - [Sensitive file copying](#sensitive-file-copying)
+  - [node_modules symlinking](#node_modules-symlinking)
+  - [Detached terminal spawn](#detached-terminal-spawn)
+  - [AI tool detection](#ai-tool-detection)
+  - [IDE handoff](#ide-handoff)
+  - [Lifecycle hooks](#lifecycle-hooks)
+  - [Branch templating](#branch-templating)
+  - [GitHub PR checkout](#github-pr-checkout)
+  - [Glob negation + env interpolation](#glob-negation--env-interpolation)
+  - [Local-only ignore](#local-only-ignore)
+  - [Metadata tracking](#metadata-tracking)
+- [Commands](#commands)
+- [Create options](#create-options)
+- [Environment overrides](#environment-overrides)
+- [Examples](#examples)
+- [Natural language usage](#natural-language-usage)
+- [Shell completions](#shell-completions)
+- [Configuration priority](#configuration-priority)
+- [Workspace mode](./docs/workspace.md)
+- [Tests](#tests)
+- [License](#license)
+
 ## Installation
 
 ```bash
@@ -123,6 +152,14 @@ Stored at `.worktrees/.metadata/<branch>.json`:
 | `list [--json]` | List worktrees with base/created/tool |
 | `status [--json]` | Show clean/dirty per worktree |
 | `prune` | Remove orphan metadata + `git worktree prune` |
+| `workspace init` | Generate `super-worktree.workspace.json` from auto-discovery |
+| `workspace list [--json]` | Show workspace projects + features |
+| `workspace create <feature> [--projects a,b\|--all]` | Create coordinated worktrees across N projects |
+| `workspace status <feature> [--json]` | Per-project clean/dirty |
+| `workspace sync <feature>` | Re-pull env/symlinks across all projects |
+| `workspace delete <feature> [--force\|--force-all]` | Remove worktrees + symlink hub + metadata |
+| `workspace merge <feature>` | Merge each project's branch into upstream and clean up |
+| `workspace prune` | Remove orphan workspace metadata |
 | `version` | Print version |
 | `help` | Show usage |
 
@@ -216,11 +253,12 @@ cp completions/super-worktree.fish ~/.config/fish/completions/
 ## Tests
 
 ```bash
-bash tests/e2e_smoke.sh      # create/list/status/delete/prune
-bash tests/e2e_features.sh   # templating, negation, sync, --json
+bash tests/e2e_smoke.sh       # single-repo: create/list/status/delete/prune
+bash tests/e2e_features.sh    # templating, negation, sync, --json
+bash tests/e2e_workspace.sh   # multi-repo workspace: 17 cases incl. rollback, hub, sync
 ```
 
-CI: `.github/workflows/ci.yml` runs shellcheck + smoke + features on push/PR.
+CI: `.github/workflows/ci.yml` runs shellcheck + all three e2e suites on push/PR.
 
 ## License
 

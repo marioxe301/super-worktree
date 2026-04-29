@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "super-worktree Workspace Configuration",
+  "description": "Workspace-level config that declares a parent folder containing multiple sibling git repos as a coordinated unit. Allows a single feature to span multiple repos with one branch name.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Workspace schema version. Current build expects 1.",
+      "const": 1
+    },
+    "workspace": {
+      "type": "object",
+      "description": "Workspace declaration.",
+      "required": ["projects"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name for the workspace (defaults to parent dir basename)."
+        },
+        "projects": {
+          "type": "array",
+          "description": "Each child project (sibling git repo) participating in the workspace.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["alias", "path"],
+            "properties": {
+              "alias": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "Short identifier; used in --projects flag and symlink hub."
+              },
+              "path": {
+                "type": "string",
+                "description": "Path to the project's git repo, relative to workspace root or absolute."
+              },
+              "defaultBase": {
+                "type": "string",
+                "description": "Per-project default base ref (overrides workspace --base when set)."
+              },
+              "copyFiles":   { "type": "array", "items": { "type": "string" } },
+              "symlinkDirs": { "type": "array", "items": { "type": "string" } },
+              "exclude":     { "type": "array", "items": { "type": "string" } },
+              "copyDepth":   { "type": "integer", "minimum": 1 },
+              "hooks": {
+                "type": "object",
+                "properties": {
+                  "preCreate":  { "type": "string" },
+                  "postCreate": { "type": "string" },
+                  "preDelete":  { "type": "string" },
+                  "postDelete": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "defaultProjects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Aliases used when --projects is omitted. If empty, all projects are selected."
+        },
+        "branchTemplate": {
+          "type": "string",
+          "description": "Template for branch name. Supports {ticket}, {slug}, {feature} placeholders."
+        },
+        "spawnMode": {
+          "type": "string",
+          "enum": ["single", "tabs"],
+          "default": "single",
+          "description": "single = one tab at workspace-feature root with symlinks; tabs = N tabs (one per project)."
+        },
+        "symlinkLayer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Create symlink hub at <workspace>/.worktrees/<feature>/<alias>. Disable for Windows without dev-mode."
+        },
+        "rollback": {
+          "type": "string",
+          "enum": ["strict", "leave"],
+          "default": "strict",
+          "description": "On partial-create failure: strict = remove already-created siblings; leave = keep them."
+        },
+        "hooks": {
+          "type": "object",
+          "description": "Workspace-scoped hooks. Run with cwd=WORKSPACE_ROOT and env: FEATURE, PROJECTS, WORKSPACE_ROOT, WORKTREE_ROOT_DIR.",
+          "properties": {
+            "preCreateAll":  { "type": "string" },
+            "postCreateAll": { "type": "string" },
+            "preDeleteAll":  { "type": "string" },
+            "postDeleteAll": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "sync": {
+      "type": "object",
+      "description": "Workspace-level default sync settings; per-project overrides take precedence.",
+      "properties": {
+        "copyFiles":   { "type": "array", "items": { "type": "string" } },
+        "symlinkDirs": { "type": "array", "items": { "type": "string" } },
+        "exclude":     { "type": "array", "items": { "type": "string" } },
+        "copyDepth":   { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

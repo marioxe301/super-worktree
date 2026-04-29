@@ -3,7 +3,7 @@
 # Place in fpath, e.g. /usr/local/share/zsh/site-functions/
 
 _super_worktree() {
-  local -a commands
+  local -a commands ws_subs
   commands=(
     'create:create a new worktree'
     'delete:remove a worktree'
@@ -12,12 +12,67 @@ _super_worktree() {
     'list:list all worktrees'
     'status:show clean/dirty per worktree'
     'prune:remove orphaned metadata'
+    'workspace:multi-repo workspace commands'
     'version:print version'
     'help:show usage'
+  )
+  ws_subs=(
+    'init:generate workspace config from auto-discovery'
+    'list:list workspace projects + features'
+    'create:create coordinated worktrees'
+    'status:per-project clean/dirty for a feature'
+    'sync:re-pull env and re-symlink across all projects'
+    'delete:remove a feature across all projects'
+    'merge:merge each project branch into upstream'
+    'prune:remove orphan workspace metadata'
   )
 
   if (( CURRENT == 2 )); then
     _describe 'command' commands
+    return
+  fi
+
+  if [[ "${words[2]}" == "workspace" ]]; then
+    if (( CURRENT == 3 )); then
+      _describe 'workspace subcommand' ws_subs
+      return
+    fi
+    case "${words[3]}" in
+      create)
+        _arguments \
+          '--projects[csv aliases]:projects' \
+          '--all[all declared projects]' \
+          '--base[workspace-wide base ref]:ref' \
+          '--per-project-base[per-project base map]:map' \
+          '--branch[explicit branch name]:branch' \
+          '--branch-override[per-project branch map]:map' \
+          '--ticket[ticket id]:ticket' \
+          '--slug[slug text]:slug' \
+          '--tool[force AI tool]:tool:(claude opencode codex cursor cline windsurf aider)' \
+          '--ide[open IDE]:ide:(code cursor windsurf idea webstorm pycharm zed subl nvim vim)' \
+          '--config[per-project sync overrides]:file:_files' \
+          '--spawn-mode[spawn mode]:mode:(single tabs)' \
+          '--no-symlink-layer[skip symlink hub]' \
+          '--no-spawn[skip terminal spawn]' \
+          '--print-cd[print cd line]' \
+          '--dry-run[no changes]'
+        ;;
+      list|status)
+        _arguments '--json[machine-readable output]'
+        ;;
+      delete)
+        _arguments \
+          '--force[delete despite dirty in some projects]' \
+          '--force-all[delete even when all projects dirty]'
+        ;;
+      init)
+        _arguments \
+          '--auto-discover[scan for git repos]' \
+          '--name[workspace name]:name' \
+          '--target[target dir]:dir:_files -/' \
+          '--force[overwrite existing config]'
+        ;;
+    esac
     return
   fi
 
@@ -35,6 +90,14 @@ _super_worktree() {
         '--ticket[ticket id]:ticket' \
         '--slug[slug text]:slug' \
         '--from-pr[checkout a PR]:pr-number' \
+        '--projects[workspace project aliases (csv)]:projects' \
+        '--all[all declared projects]' \
+        '--base[base ref]:ref' \
+        '--branch[explicit branch name]:branch' \
+        '--per-project-base[per-project base map]:map' \
+        '--branch-override[per-project branch map]:map' \
+        '--spawn-mode[spawn mode]:mode:(single tabs)' \
+        '--no-symlink-layer[skip symlink hub]' \
         '--no-spawn[skip terminal spawn]' \
         '--print-cd[print cd line]' \
         '--dry-run[no changes]'

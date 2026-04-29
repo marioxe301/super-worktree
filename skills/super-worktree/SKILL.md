@@ -7,6 +7,25 @@ description: Create isolated git worktrees for parallel feature work with monore
 
 A skill for managing isolated git worktrees for parallel feature development with monorepo-aware env file copying and node_modules symlinking.
 
+## Modes
+
+**Single repo:** invoked inside a git repo; manages worktrees under `<repo>/.worktrees/`.
+
+**Workspace (multi-repo):** invoked at a parent folder containing multiple sibling git repos (`api/`, `ui/`, `db/`, …). One feature branch spans N selected projects. Worktrees stay inside each project; a symlink hub at `<workspace>/.worktrees/<feature>/<alias>` gives the AI session a unified view.
+
+Workspace mode activates only when `super-worktree.workspace.json` is found at cwd or any ancestor. See [docs/workspace.md](docs/workspace.md) for the full reference.
+
+```bash
+# Workspace flow
+bash scripts/worktree-manager.sh workspace init --name myapp
+bash scripts/worktree-manager.sh workspace create feat/payments --projects api,ui
+bash scripts/worktree-manager.sh workspace status feat/payments
+bash scripts/worktree-manager.sh workspace sync   feat/payments
+bash scripts/worktree-manager.sh workspace delete feat/payments --force
+```
+
+`bash scripts/worktree-manager.sh create feat/payments --projects api,ui` at workspace root auto-routes to `workspace create`.
+
 ## Worktree Creation Overview
 
 Git worktrees let you work on multiple branches simultaneously in a single repository. This skill enhances worktrees with:

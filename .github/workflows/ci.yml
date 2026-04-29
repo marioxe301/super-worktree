@@ -13,7 +13,7 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck jq
       - name: Run shellcheck
-        run: shellcheck -x scripts/worktree-manager.sh scripts/lib/*.sh tests/*.sh
+        run: shellcheck -x scripts/worktree-manager.sh scripts/lib/*.sh tests/*.sh tests/fixtures/*.sh
 
   e2e:
     runs-on: ubuntu-latest
@@ -26,5 +26,9 @@ jobs:
           git config --global user.email ci@example.com
           git config --global user.name CI
           git config --global init.defaultBranch main
-      - name: Run smoke test
+      - name: Run single-repo smoke
         run: bash tests/e2e_smoke.sh
+      - name: Run single-repo features
+        run: bash tests/e2e_features.sh
+      - name: Run workspace e2e
+        run: bash tests/e2e_workspace.sh
