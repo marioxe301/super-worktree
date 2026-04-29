@@ -230,6 +230,18 @@ Invoke via natural language prompts to your AI agent:
 - "Create a worktree and open it in cursor"
 - "Open feature/ui in VS Code instead"
 
+**Workspace (multi-repo):**
+- "Initialize a workspace at this folder so I can work across api, ui, and db"
+- "Spin up coordinated worktrees for feat/payments across api and ui"
+- "Start TEST-42 with slug 'rate limiter' across all projects"
+- "Create feat/checkout in api from main and ui from develop"
+- "Show me which workspace projects are dirty for feat/payments"
+- "Sync env files across every project in feat/payments after I rotated secrets"
+- "Tear down feat/payments — force it even if any project is dirty"
+- "Merge feat/payments into upstream in each project and clean up"
+- "Open feat/payments in tabs mode so I get one terminal per repo"
+- "Create feat/db-only just in db, skip the rest"
+
 ## Shell completions
 
 ```bash
