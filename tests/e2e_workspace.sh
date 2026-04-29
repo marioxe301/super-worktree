@@ -21,7 +21,7 @@ bash "$SCRIPT" workspace list --json | jq -e '.workspace.name == "test-workspace
 bash "$SCRIPT" workspace list --json | jq -e '.projects | length == 3' >/dev/null
 
 echo "==> 3. workspace create with default projects"
-NO_SPAWN=1 bash "$SCRIPT" workspace create feat/x >/dev/null
+bash "$SCRIPT" workspace create feat/x >/dev/null
 test -d "$TMP/api/.worktrees/feat/x"
 test -d "$TMP/ui/.worktrees/feat/x"
 test ! -d "$TMP/db/.worktrees/feat/x"
@@ -75,21 +75,21 @@ test ! -e "$TMP/.worktrees/feat/x"
 test ! -f "$meta"
 
 echo "==> 14. workspace create --all selects every project"
-NO_SPAWN=1 bash "$SCRIPT" workspace create feat/all --all >/dev/null
+bash "$SCRIPT" workspace create feat/all --all >/dev/null
 test -d "$TMP/api/.worktrees/feat/all"
 test -d "$TMP/ui/.worktrees/feat/all"
 test -d "$TMP/db/.worktrees/feat/all"
 
 echo "==> 15. duplicate worktree refused"
-{ NO_SPAWN=1 bash "$SCRIPT" workspace create feat/all --all 2>&1 || true; } | grep -q "already exists"
+{ bash "$SCRIPT" workspace create feat/all --all 2>&1 || true; } | grep -q "already exists"
 
 echo "==> 16. bare 'create' at workspace root routes to workspace"
-NO_SPAWN=1 bash "$SCRIPT" create feat/bare --projects db >/dev/null
+bash "$SCRIPT" create feat/bare --projects db >/dev/null
 test -d "$TMP/db/.worktrees/feat/bare"
 
 echo "==> 17. single-repo regression (inside one project)"
 ( cd "$TMP/api"
-  NO_SPAWN=1 bash "$SCRIPT" create test-single >/dev/null
+  bash "$SCRIPT" create test-single >/dev/null
   test -d "$TMP/api/.worktrees/test-single"
   bash "$SCRIPT" delete test-single >/dev/null
 )

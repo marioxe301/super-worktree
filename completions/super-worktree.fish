@@ -43,11 +43,8 @@ complete -c $prog -n __sw_ws_create -l branch-override   -d 'alias=branch,...'
 complete -c $prog -n __sw_ws_create -l ticket            -d 'ticket id'
 complete -c $prog -n __sw_ws_create -l slug              -d 'slug text'
 complete -c $prog -n __sw_ws_create -l tool              -xa 'claude opencode codex cursor cline windsurf aider'
-complete -c $prog -n __sw_ws_create -l ide               -xa 'code cursor windsurf idea webstorm pycharm zed subl nvim vim'
 complete -c $prog -n __sw_ws_create -l config            -r -d 'config JSON'
-complete -c $prog -n __sw_ws_create -l spawn-mode        -xa 'single tabs'
 complete -c $prog -n __sw_ws_create -l no-symlink-layer  -d 'skip symlink hub'
-complete -c $prog -n __sw_ws_create -l no-spawn          -d 'skip terminal spawn'
 complete -c $prog -n __sw_ws_create -l print-cd          -d 'print cd line'
 complete -c $prog -n __sw_ws_create -l dry-run           -d 'no changes'
 
@@ -82,11 +79,9 @@ complete -c $prog -n '__fish_seen_subcommand_from delete merge sync' -a '(__sw_b
 
 complete -c $prog -n '__fish_seen_subcommand_from create' -l config   -r -d 'custom config JSON'
 complete -c $prog -n '__fish_seen_subcommand_from create' -l tool     -xa 'claude opencode codex cursor cline windsurf aider'
-complete -c $prog -n '__fish_seen_subcommand_from create' -l ide      -xa 'code cursor windsurf idea webstorm pycharm zed subl nvim vim'
 complete -c $prog -n '__fish_seen_subcommand_from create' -l ticket   -d 'ticket id'
 complete -c $prog -n '__fish_seen_subcommand_from create' -l slug     -d 'slug text'
 complete -c $prog -n '__fish_seen_subcommand_from create' -l from-pr  -d 'PR number'
-complete -c $prog -n '__fish_seen_subcommand_from create' -l no-spawn -d 'skip terminal spawn'
 complete -c $prog -n '__fish_seen_subcommand_from create' -l print-cd -d 'print cd line'
 complete -c $prog -n '__fish_seen_subcommand_from create' -l dry-run  -d 'no changes'
 

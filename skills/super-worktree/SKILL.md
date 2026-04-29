@@ -1,6 +1,6 @@
 ---
 name: super-worktree
-description: "Create isolated git worktrees for parallel feature development. Single repo or multi-repo workspace — one feature branch can span api, ui, db, workers, etc. simultaneously. Auto-copies env files, symlinks node_modules, detects AI tool (claude/opencode/codex/cursor/cline/windsurf/aider), spawns detached terminal that survives the calling shell. Trigger when the user asks to create/spin-up/start a worktree or feature branch, work on multiple repos at once, coordinate branches across api+ui or other sibling repos, initialize a multi-repo workspace, sync env files into existing worktrees, delete/merge/list worktrees, check dirty state across projects, or open a feature in a specific AI tool or IDE."
+description: "Create isolated git worktrees for parallel feature development. Single repo or multi-repo workspace — one feature branch can span api, ui, db, workers, etc. simultaneously. Auto-copies env files, symlinks node_modules, then prints a copy-pasteable cd hint (no terminal/IDE spawn — clean and reliable on every OS). Trigger when the user asks to create/spin-up/start a worktree or feature branch, work on multiple repos at once, coordinate branches across api+ui or other sibling repos, initialize a multi-repo workspace, sync env files into existing worktrees, delete/merge/list worktrees, or check dirty state across projects."
 ---
 
 # super-worktree
@@ -32,10 +32,10 @@ Git worktrees let you work on multiple branches simultaneously in a single repos
 
 - **Sensitive file copying** — `.env`, credentials, secrets propagated to new worktrees (configurable depth for monorepos)
 - **node_modules symlinking** — saves disk space; supports nested workspace layouts
-- **Detached terminal spawn** — opens new tmux/zellij/Kitty/WezTerm/Ghostty/Alacritty/GNOME/Konsole/Windows-Terminal/iTerm2 tab and auto-launches the detected AI tool (claude, opencode, codex, cursor, cline, windsurf, aider). Survives the calling AI session via `setsid`+`disown`.
+- **Cd hint output** — after create, prints a bordered block with a copy-pasteable `cd` command. Pass `--tool <name>` to append ` && <name>` so you can launch your AI tool in one paste.
 - **Lifecycle hooks** — `preCreate`/`postCreate`/`preDelete`/`postDelete` shell commands from config
 - **Local-only ignore** — uses `.git/info/exclude` instead of polluting tracked `.gitignore`
-- **Metadata tracking** — base branch, creation timestamp, AI tool stored per worktree under `.worktrees/.metadata/<branch>.json`
+- **Metadata tracking** — base branch, creation timestamp, AI tool name stored per worktree under `.worktrees/.metadata/<branch>.json`
 - **Configurable patterns** — global (`~/.config/super-worktree/config.json`), project (`super-worktree.json`), or `--config` flag
 
 ## Creating a worktree
@@ -50,33 +50,27 @@ bash scripts/worktree-manager.sh create <branch> [from-branch] [options]
 
 **Options:**
 - `--config <file>` — custom config JSON path
-- `--tool <name>` — force AI tool (claude, opencode, codex, cursor, cline, windsurf, aider)
-- `--ide <name>` — open IDE instead of AI tool (code, cursor, idea, webstorm, pycharm, zed, subl, nvim, vim)
+- `--tool <name>` — AI tool name appended to printed cd hint (e.g. `claude`, `opencode`, `codex`)
 - `--ticket <id>` — ticket id, used for branch templating (e.g. `WFL-1234`)
 - `--slug <text>` — slug text; combined with `--ticket` to form `wfl-1234-research-helmet`
 - `--from-pr <num>` — fetch and check out a GitHub PR via `gh pr checkout`
-- `--no-spawn` — skip terminal spawn (useful for scripts/CI)
-- `--print-cd` — print `cd <path>` to stdout (so callers can `eval $(...)`)
+- `--print-cd` — print machine-friendly `cd <path>` to stdout (so callers can `eval $(...)`)
 - `--dry-run` — show intended actions; no changes
 
 **Environment overrides:**
-- `SUPER_WORKTREE_TOOL=<name>` — override AI tool detection
 - `TRUST_DIRENV=1` — auto-run `direnv allow` on copied `.envrc`
-- `NO_SPAWN=1` / `DRY_RUN=1` / `PRINT_CD=1` — equivalent to flags
+- `DRY_RUN=1` / `PRINT_CD=1` — equivalent to flags
 
 **Examples:**
 ```bash
 # Create feature branch from origin/HEAD
 bash scripts/worktree-manager.sh create feature/new-login
 
-# Custom config + force claude tool
+# Custom config + claude appended to cd hint
 bash scripts/worktree-manager.sh create feature/pay --config .super-worktree.json --tool claude
 
-# CI-friendly creation (no terminal launch)
-bash scripts/worktree-manager.sh create hotfix/urgent --no-spawn
-
 # Eval cd into new worktree from your shell
-cd "$(bash scripts/worktree-manager.sh create feat/x --print-cd --no-spawn | tail -1 | sed 's|^cd ||')"
+eval "$(bash scripts/worktree-manager.sh create feat/x --print-cd)"
 ```
 
 ## Deleting a worktree
@@ -283,33 +277,7 @@ cp completions/_super-worktree /usr/local/share/zsh/site-functions/
 cp completions/super-worktree.fish ~/.config/fish/completions/
 ```
 
-Completes subcommands, branch names (for `delete`/`merge`/`sync`), and flag values (`--tool`, `--ide`).
-
-## AI Tool Detection
-
-Resolution precedence (first match wins):
-1. `--tool <name>` flag
-2. `SUPER_WORKTREE_TOOL` env var
-3. Parent process walk: traverses up to 12 ancestors, skipping shells (`bash`, `zsh`, `fish`, `pwsh`, …), matches against `claude`, `opencode`, `codex`, `cline`, `cursor`, `windsurf`, `aider`
-4. Fallback: `opencode` (with warning)
-
-## Terminal Spawn Priority
-
-Tries in order, stops at first success:
-1. **cmux** (when `$CMUX_WORKSPACE_ID` set)
-2. **tmux** — new window inside session, or detached `wt-<branch>` session outside
-3. **zellij** (when `$ZELLIJ` set)
-4. **WezTerm** — `wezterm cli spawn` tab, fallback to detached window
-5. **Kitty** — `kitty @ launch` tab, fallback to detached window
-6. **Ghostty**
-7. **Alacritty**
-8. **GNOME Terminal**
-9. **Konsole**
-10. **Windows Terminal** (`wt.exe`, WSL)
-11. **iTerm2** / **Terminal.app** (macOS, AppleScript)
-12. Fallback: prints manual `cd … && <ai_tool>` instructions
-
-External terminals are launched via `setsid nohup … & disown` so they survive the calling AI session exiting.
+Completes subcommands, branch names (for `delete`/`merge`/`sync`), and `--tool` value choices.
 
 ## Troubleshooting
 

@@ -44,7 +44,6 @@ cat > "$ws_root/super-worktree.workspace.json" <<JSON
 $projects_json
     ],
     "defaultProjects": [$defaults_json],
-    "spawnMode": "single",
     "symlinkLayer": true,
     "rollback": "strict"
   }

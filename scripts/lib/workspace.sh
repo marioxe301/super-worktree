@@ -11,7 +11,6 @@
 #   WS_PROJECT_BASES       - alias -> defaultBase ref (may be empty)
 #   WS_DEFAULT_PROJECTS    - indexed array; empty means "all"
 #   WS_BRANCH_TEMPLATE     - template string (may be empty)
-#   WS_SPAWN_MODE          - "single" or "tabs"
 #   WS_SYMLINK_LAYER       - 1/0
 #   WS_ROLLBACK            - "strict" or "leave"
 #   WS_HOOKS               - associative; keys: preCreateAll postCreateAll preDeleteAll postDeleteAll
@@ -25,7 +24,6 @@ declare -gA WS_PROJECT_PATHS=()
 declare -gA WS_PROJECT_BASES=()
 declare -ga WS_DEFAULT_PROJECTS=()
 declare -g  WS_BRANCH_TEMPLATE=""
-declare -g  WS_SPAWN_MODE="single"
 declare -g  WS_SYMLINK_LAYER=1
 declare -g  WS_ROLLBACK="strict"
 declare -gA WS_HOOKS=()
@@ -80,7 +78,6 @@ _ws_reset() {
   WS_PROJECT_BASES=()
   WS_DEFAULT_PROJECTS=()
   WS_BRANCH_TEMPLATE=""
-  WS_SPAWN_MODE="single"
   WS_SYMLINK_LAYER=1
   WS_ROLLBACK="strict"
   WS_HOOKS=()
@@ -109,10 +106,6 @@ _ws_parse_config() {
   [[ -z "$WORKSPACE_NAME" ]] && WORKSPACE_NAME="$(basename "$WORKSPACE_ROOT")"
 
   WS_BRANCH_TEMPLATE="$(jq -r '.workspace.branchTemplate // empty' "$file")"
-
-  local sm
-  sm="$(jq -r '.workspace.spawnMode // "single"' "$file")"
-  case "$sm" in single|tabs) WS_SPAWN_MODE="$sm" ;; *) die "invalid spawnMode '$sm' in $file" ;; esac
 
   local sl
   sl="$(jq -r '.workspace.symlinkLayer // true' "$file")"
@@ -504,7 +497,7 @@ ws_init_config() {
   jq -n \
     --arg name "$name" \
     --argjson projects "$projects_json" \
-    '{version:1, workspace:{name:$name, projects:$projects, spawnMode:"single", symlinkLayer:true, rollback:"strict"}}' \
+    '{version:1, workspace:{name:$name, projects:$projects, symlinkLayer:true, rollback:"strict"}}' \
     > "$out"
 
   log "Wrote $out (${#repos[@]} project(s))"

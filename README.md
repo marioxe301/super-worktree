@@ -2,9 +2,9 @@
 
 ![super-worktree](./super-worktree.png)
 
-Create isolated git worktrees for parallel feature work. Auto-copies env files, symlinks `node_modules`, detects your AI tool, and spawns a detached terminal session that survives the calling shell.
+Create isolated git worktrees for parallel feature work. Auto-copies env files, symlinks `node_modules`, then prints a copy-pasteable `cd` line. No terminal/IDE spawn — clean and reliable on every OS.
 
-Single repo or **multi-repo workspace** — one feature branch can span `api/`, `ui/`, `db/`, etc. simultaneously, with one AI session at a unified workspace root. See [docs/workspace.md](./docs/workspace.md).
+Single repo or **multi-repo workspace** — one feature branch can span `api/`, `ui/`, `db/`, etc. simultaneously. See [docs/workspace.md](./docs/workspace.md).
 
 ## Contents
 
@@ -13,9 +13,7 @@ Single repo or **multi-repo workspace** — one feature branch can span `api/`, 
 - [Features](#features)
   - [Sensitive file copying](#sensitive-file-copying)
   - [node_modules symlinking](#node_modules-symlinking)
-  - [Detached terminal spawn](#detached-terminal-spawn)
-  - [AI tool detection](#ai-tool-detection)
-  - [IDE handoff](#ide-handoff)
+  - [Cd hint output](#cd-hint-output)
   - [Lifecycle hooks](#lifecycle-hooks)
   - [Branch templating](#branch-templating)
   - [GitHub PR checkout](#github-pr-checkout)
@@ -60,33 +58,18 @@ Defaults: `.env`, `.env.*`, `.envrc`, `.local.*`, `*.secret`, `*.key`, `.secrets
 
 Saves disk space. Discovers nested workspace `node_modules` automatically.
 
-### Detached terminal spawn
+### Cd hint output
 
-Opens a new terminal tab/session and auto-runs the detected AI tool. Spawned with `setsid nohup … & disown` so it survives the calling AI session exiting.
+After `create`, prints a bordered block with a copy-pasteable `cd` command. Pass `--tool <name>` to append ` && <name>` to the line so you can launch your AI tool in one paste.
 
-| Terminal | Platform | Priority |
-|----------|----------|----------|
-| cmux | all | 1 (when `$CMUX_WORKSPACE_ID` set) |
-| tmux | all | 2 (new window inside session, detached session outside) |
-| zellij | all | 3 (when `$ZELLIJ` set) |
-| WezTerm | all | 4 |
-| Kitty | Linux/macOS | 5 |
-| Ghostty | macOS/Linux | 6 |
-| Alacritty | all | 7 |
-| GNOME Terminal | Linux | 8 |
-| Konsole | Linux | 9 |
-| Windows Terminal (WSL) | Windows | 10 |
-| iTerm2 / Terminal.app | macOS | 11 |
+```
+========================================
+Worktree ready: /repo/.worktrees/feat-x
+  cd /repo/.worktrees/feat-x && claude
+========================================
+```
 
-Fallback: prints `cd … && <ai_tool>` instructions.
-
-### AI tool detection
-
-Precedence: `--tool` flag → `$SUPER_WORKTREE_TOOL` → parent process walk (skips shells, matches `claude`/`opencode`/`codex`/`cursor`/`cline`/`windsurf`/`aider`) → `opencode` fallback.
-
-### IDE handoff
-
-`--ide code|cursor|idea|webstorm|pycharm|zed|subl|nvim|vim` opens the IDE instead of an AI tool.
+`--print-cd` switches to a single machine-friendly `cd %q` line on stdout (no border) for `eval`-style integration.
 
 ### Lifecycle hooks
 
@@ -170,22 +153,19 @@ Stored at `.worktrees/.metadata/<branch>.json`:
 | Flag | Effect |
 |------|--------|
 | `--config <file>` | Custom config JSON |
-| `--tool <name>` | Force AI tool |
-| `--ide <name>` | Open IDE instead of AI tool |
+| `--tool <name>` | AI tool name appended to printed `cd` hint (e.g. `claude`) |
 | `--ticket <id>` | Ticket id for branch templating |
 | `--slug <text>` | Slug for branch templating |
 | `--from-pr <num>` | Check out a GitHub PR (requires `gh`) |
-| `--no-spawn` | Skip terminal spawn |
-| `--print-cd` | Print `cd <path>` to stdout |
+| `--print-cd` | Print `cd <path>` to stdout (machine-friendly, single line) |
 | `--dry-run` | Print intended actions; no changes |
 
 ## Environment overrides
 
 | Var | Effect |
 |-----|--------|
-| `SUPER_WORKTREE_TOOL` | Override AI tool detection |
 | `TRUST_DIRENV=1` | Auto-run `direnv allow` on copied `.envrc` |
-| `NO_SPAWN=1` / `DRY_RUN=1` / `PRINT_CD=1` / `JSON_OUT=1` | Equivalent to flags |
+| `DRY_RUN=1` / `PRINT_CD=1` / `JSON_OUT=1` | Equivalent to flags |
 
 ## Examples
 
@@ -198,17 +178,11 @@ bash scripts/worktree-manager.sh create feature/login
 # Create from develop with custom config
 bash scripts/worktree-manager.sh create feature/payments develop --config .super-worktree.json
 
-# Templated branch + force claude tool
+# Templated branch + claude in printed cd hint
 bash scripts/worktree-manager.sh create --ticket TEST-1 --slug "test feature" --tool claude
 
-# CI-friendly creation
-bash scripts/worktree-manager.sh create hotfix --no-spawn
-
-# Open in VS Code instead of AI tool
-bash scripts/worktree-manager.sh create feature/ui --ide code
-
 # Eval cd into new worktree
-cd "$(bash scripts/worktree-manager.sh create feat --print-cd --no-spawn | tail -1 | sed 's|^cd ||')"
+eval "$(bash scripts/worktree-manager.sh create feat --print-cd)"
 
 # Re-pull env after rotation
 bash scripts/worktree-manager.sh sync feature/login
@@ -243,9 +217,6 @@ bash scripts/worktree-manager.sh workspace create feat/checkout \
 
 # Templated workspace branch
 bash scripts/worktree-manager.sh workspace create --ticket TEST-42 --slug "rate limiter" --all
-
-# One terminal tab per project instead of unified hub
-bash scripts/worktree-manager.sh workspace create feat/wide --all --spawn-mode tabs
 
 # Bare 'create' at workspace root auto-routes to workspace create
 bash scripts/worktree-manager.sh create feat/payments --projects api,ui
@@ -284,7 +255,6 @@ Any of these patterns will route the agent into super-worktree:
 - "work on X in parallel without touching my current branch"
 - "I need to work on api and ui at the same time for feature X"
 - "coordinate a feature branch across multiple repos"
-- "open feature X in a new terminal / new tab / cursor / VS Code"
 - "delete / merge / sync / list worktrees"
 - "show me dirty worktrees / which projects have changes"
 - "tear down feature X across all projects"
@@ -305,11 +275,9 @@ Any of these patterns will route the agent into super-worktree:
 - "List my worktrees / show me which ones are dirty"
 - "Merge feature/login back into main and clean up the worktree"
 
-**With specific tools / IDEs:**
-- "Create a worktree and open it in cursor"
-- "Open feature/ui in VS Code instead"
-- "Spin up feat/x in a fresh kitty window"
-- "Open this in claude / opencode / codex"
+**With specific AI tool in cd hint:**
+- "Create a worktree and append `claude` to the cd hint"
+- "Set up feat/x with `--tool codex`"
 
 ### Workspace (multi-repo)
 
@@ -324,7 +292,6 @@ Any of these patterns will route the agent into super-worktree:
 - "Start TEST-42 with slug 'rate limiter' across all projects"
 - "Create feat/checkout in api from main and ui from develop"
 - "I need to touch api and ui together for the new auth flow"
-- "Open feat/payments in tabs mode so I get one terminal per repo"
 - "Create feat/db-only just in db, skip the rest"
 
 **Status / sync / teardown:**
@@ -341,7 +308,7 @@ Any of these patterns will route the agent into super-worktree:
 |---------|------------|
 | "Start TEST-1 in api and ui" | `workspace create test-1 --projects api,ui` |
 | "Same feature, but pick the base branch separately for ui" | `workspace create test-1 --projects api,ui --per-project-base ui=develop` |
-| "Open it in cursor when ready" | adds `--ide cursor` (or `--tool` for AI agents) |
+| "Append claude to the cd hint" | adds `--tool claude` |
 | "Force delete feat/x across everything" | `workspace delete feat/x --force-all` |
 | "Dump status as JSON for my dashboard" | `workspace status feat/x --json` |
 

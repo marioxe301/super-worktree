@@ -67,7 +67,6 @@ bash scripts/worktree-manager.sh workspace delete feat/payments
     ],
     "defaultProjects": ["api", "ui"],
     "branchTemplate": "feat/{ticket}-{slug}",
-    "spawnMode": "single",
     "symlinkLayer": true,
     "rollback": "strict",
     "hooks": {
@@ -91,7 +90,6 @@ bash scripts/worktree-manager.sh workspace delete feat/payments
 | `workspace.projects[].{copyFiles,symlinkDirs,exclude,copyDepth,hooks}` | Per-project overrides; overlays workspace `sync` defaults. |
 | `workspace.defaultProjects` | Aliases used when `--projects` is omitted. Empty/absent = all. |
 | `workspace.branchTemplate` | Template for branch name. Supports `{ticket}`, `{slug}`, `{feature}`. |
-| `workspace.spawnMode` | `single` (default) = one tab at hub; `tabs` = N tabs (one per project). |
 | `workspace.symlinkLayer` | Default `true`. Set `false` for Windows without dev mode. |
 | `workspace.rollback` | `strict` (default) = remove created siblings on failure; `leave` = keep partial state. |
 | `workspace.hooks.preCreateAll` | Runs once before any worktree creation (cwd = workspace root). |
@@ -123,12 +121,10 @@ bash scripts/worktree-manager.sh workspace delete feat/payments
 | `--branch <name>` | Explicit branch name (skips template). |
 | `--branch-override api=feat/x-api,ui=feat/x-ui` | Per-project branch override (e.g. align with existing CI branch). |
 | `--ticket <id>` / `--slug <text>` | Template-based branch naming. |
-| `--tool <name>` | Force AI tool. Single detection at workspace level. |
-| `--ide <name>` | Open IDE instead of AI tool. |
+| `--tool <name>` | AI tool name appended to each printed per-project `cd` line. |
 | `--config <file>` | Custom per-project sync overrides; overlays workspace base. |
-| `--spawn-mode single\|tabs` | Override config; default `single`. |
 | `--no-symlink-layer` | Skip the symlink hub (useful on Windows without dev mode). |
-| `--no-spawn` / `--print-cd` / `--dry-run` | Same as single-mode. |
+| `--print-cd` / `--dry-run` | Same as single-mode. |
 
 ## Hooks
 
@@ -144,10 +140,9 @@ Order on create: `preCreateAll` → for each project (`preCreate` → `git workt
 
 A failing `preCreateAll` aborts before any worktree is created. A per-project failure mid-sequence triggers atomic rollback when `rollback: "strict"` (default).
 
-## Spawn modes
+## Cd hint output
 
-- **single** (default) — one terminal tab at the hub `<workspace>/.worktrees/<feature>/`. AI tools see all selected projects as sibling subdirectories.
-- **tabs** — one terminal tab per project, each cwd inside that project's real worktree. Pick this for tmux/zellij users who prefer one window per repo.
+After `workspace create`, prints a bordered block listing the hub plus one `cd` line per selected project. Pass `--tool <name>` to append ` && <name>` to each per-project line. Paste whichever line you need.
 
 ## Atomic rollback
 
@@ -180,7 +175,7 @@ When `rollback: "strict"` and a per-project step fails, super-worktree:
 | Delete with one dirty project | Default refuses. `--force` / `--force-all` overrides. |
 | Branch already exists in some projects | Pre-flight detects and aborts; use `--branch-override` to attach to existing names per project. |
 | Workspace config edited mid-flight | Metadata captured at create time; delete/sync use the captured list. |
-| Symlinks fail (Windows without dev mode) | Falls back to a `.path` text file pointer; AI tool needs to be opened per-project (`--spawn-mode tabs` recommended). |
+| Symlinks fail (Windows without dev mode) | Falls back to a `.path` text file pointer; cd into each per-project worktree directly using the printed lines. |
 
 ## Files written by workspace mode
 
@@ -199,5 +194,5 @@ Existing single-repo users adopting workspace mode for the first time:
 
 1. Move `api/`, `ui/`, etc. to siblings under one parent (or use them in place if already arranged that way).
 2. `cd <parent>; bash scripts/worktree-manager.sh workspace init --name <n>`.
-3. Edit the generated `super-worktree.workspace.json` to set `defaultProjects`, hooks, and `spawnMode`.
+3. Edit the generated `super-worktree.workspace.json` to set `defaultProjects` and hooks.
 4. Existing per-project worktrees keep working — workspace mode is purely additive.

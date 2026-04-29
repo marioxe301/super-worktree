@@ -28,7 +28,7 @@ trap 'rm -rf "$TMP"' EXIT
 JSON
 
   echo "==> create with --ticket and --slug"
-  NO_SPAWN=1 bash "$SCRIPT" create --ticket TEST-1 --slug "test feature"
+  bash "$SCRIPT" create --ticket TEST-1 --slug "test feature"
 
   expected_branch="test-1-test-feature"
   test -d "$TMP/.worktrees/$expected_branch" || { echo "missing $expected_branch"; exit 1; }
@@ -47,7 +47,7 @@ JSON
 
   echo "==> rotate .env and run sync"
   printf 'FOO=updated\n' > .env
-  NO_SPAWN=1 bash "$SCRIPT" sync "$expected_branch"
+  bash "$SCRIPT" sync "$expected_branch"
   grep -q updated "$TMP/.worktrees/$expected_branch/.env" || { echo "sync failed"; exit 1; }
 
   echo "==> delete"

@@ -48,12 +48,9 @@ _super_worktree() {
           '--branch-override[per-project branch map]:map' \
           '--ticket[ticket id]:ticket' \
           '--slug[slug text]:slug' \
-          '--tool[force AI tool]:tool:(claude opencode codex cursor cline windsurf aider)' \
-          '--ide[open IDE]:ide:(code cursor windsurf idea webstorm pycharm zed subl nvim vim)' \
+          '--tool[AI tool name appended to printed cd hint]:tool:(claude opencode codex cursor cline windsurf aider)' \
           '--config[per-project sync overrides]:file:_files' \
-          '--spawn-mode[spawn mode]:mode:(single tabs)' \
           '--no-symlink-layer[skip symlink hub]' \
-          '--no-spawn[skip terminal spawn]' \
           '--print-cd[print cd line]' \
           '--dry-run[no changes]'
         ;;
@@ -85,8 +82,7 @@ _super_worktree() {
     create)
       _arguments \
         '--config[custom config JSON]:file:_files' \
-        '--tool[force AI tool]:tool:(claude opencode codex cursor cline windsurf aider)' \
-        '--ide[open IDE]:ide:(code cursor windsurf idea webstorm pycharm zed subl nvim vim)' \
+        '--tool[AI tool name appended to printed cd hint]:tool:(claude opencode codex cursor cline windsurf aider)' \
         '--ticket[ticket id]:ticket' \
         '--slug[slug text]:slug' \
         '--from-pr[checkout a PR]:pr-number' \
@@ -96,9 +92,7 @@ _super_worktree() {
         '--branch[explicit branch name]:branch' \
         '--per-project-base[per-project base map]:map' \
         '--branch-override[per-project branch map]:map' \
-        '--spawn-mode[spawn mode]:mode:(single tabs)' \
         '--no-symlink-layer[skip symlink hub]' \
-        '--no-spawn[skip terminal spawn]' \
         '--print-cd[print cd line]' \
         '--dry-run[no changes]'
       ;;

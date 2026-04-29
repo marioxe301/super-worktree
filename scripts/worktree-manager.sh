@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# super-worktree - git worktree manager with env file copying, node_modules
-# symlinking, AI tool detection, and detached terminal spawn.
+# super-worktree - git worktree manager with env file copying and node_modules
+# symlinking. Prints a copy-pasteable cd hint after create.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,8 +8,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/util.sh"
 # shellcheck source=lib/config.sh
 source "$SCRIPT_DIR/lib/config.sh"
-# shellcheck source=lib/spawn.sh
-source "$SCRIPT_DIR/lib/spawn.sh"
 # shellcheck source=lib/sync.sh
 source "$SCRIPT_DIR/lib/sync.sh"
 # shellcheck source=lib/workspace.sh
@@ -55,7 +53,6 @@ _require_single_mode() {
 }
 
 DRY_RUN="${DRY_RUN:-0}"
-NO_SPAWN="${NO_SPAWN:-0}"
 PRINT_CD="${PRINT_CD:-0}"
 JSON_OUT="${JSON_OUT:-0}"
 
@@ -100,12 +97,10 @@ Misc:
 
 Create options:
   --config <file>     Custom config JSON
-  --tool <name>       Force AI tool (claude, opencode, codex, ...)
-  --ide <name>        Open IDE instead of AI tool (code, cursor, idea)
+  --tool <name>       AI tool name appended to printed cd hint (e.g. 'claude')
   --ticket <id>       Ticket id for branch templating (e.g. WFL-1234)
   --slug <text>       Slug for branch templating (kebab-cased)
   --from-pr <num>     Check out a GitHub PR (requires gh)
-  --no-spawn          Skip terminal spawn
   --print-cd          Print 'cd <path>' line to stdout (for shell eval)
   --dry-run           Print intended actions; make no changes
 
@@ -116,10 +111,8 @@ Workspace create options:
   --per-project-base api=develop,ui=main
   --branch <name>     Explicit branch name (skips template)
   --branch-override api=feat/x-api,ui=feat/x-ui
-  --spawn-mode <m>    single (default) | tabs
 
 Environment:
-  SUPER_WORKTREE_TOOL  Override AI tool detection
   TRUST_DIRENV=1       Auto-run 'direnv allow' on copied .envrc
 EOF
 }
@@ -161,17 +154,15 @@ cmd_create() {
     return $?
   fi
   _require_single_mode
-  local branch="" from_branch="" custom_config="" cli_tool="" ide="" ticket="" slug="" from_pr=""
+  local branch="" from_branch="" custom_config="" cli_tool="" ticket="" slug="" from_pr=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --config)    custom_config="$2"; shift 2 ;;
       --tool)      cli_tool="$2";      shift 2 ;;
-      --ide)       ide="$2";           shift 2 ;;
       --ticket)    ticket="$2";        shift 2 ;;
       --slug)      slug="$2";          shift 2 ;;
       --from-pr)   from_pr="$2";       shift 2 ;;
-      --no-spawn)  NO_SPAWN=1;         shift   ;;
       --print-cd)  PRINT_CD=1;         shift   ;;
       --dry-run)   DRY_RUN=1;          shift   ;;
       -*)          die "unknown flag: $1" ;;
@@ -243,21 +234,11 @@ cmd_create() {
   symlink_node_modules "$WORKTREE_DIR/$branch"
   trust_dev_tools "$GIT_ROOT" "$WORKTREE_DIR/$branch"
 
-  local resolved_tool
-  resolved_tool=$(detect_ai_tool "$cli_tool")
-  write_metadata "$branch" "$base_ref" "$resolved_tool"
+  write_metadata "$branch" "$base_ref" "$cli_tool"
 
   run_hook postCreate "BRANCH=$branch" "BASE=$base_ref" "WORKTREE_PATH=$WORKTREE_DIR/$branch"
 
-  log ""
-  log "Worktree ready: $WORKTREE_DIR/$branch"
-  print_cd_hint "$WORKTREE_DIR/$branch"
-
-  if [[ -n "$ide" ]]; then
-    spawn_ide "$WORKTREE_DIR/$branch" "$ide"
-  else
-    spawn_terminal "$WORKTREE_DIR/$branch" "$branch" "$cli_tool"
-  fi
+  print_cd_hint "$WORKTREE_DIR/$branch" "$cli_tool"
 
   WORKTREE_CREATED=0
 }
@@ -501,8 +482,8 @@ cmd_workspace_create() {
 
   local feature="" projects_csv="" workspace_base=""
   local pp_base="" pp_branch="" branch_explicit=""
-  local ticket="" slug="" cli_tool="" ide="" custom_config=""
-  local spawn_mode="" symlink_layer_override=""
+  local ticket="" slug="" cli_tool="" custom_config=""
+  local symlink_layer_override=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -515,11 +496,8 @@ cmd_workspace_create() {
       --ticket)           ticket="$2"; shift 2 ;;
       --slug)             slug="$2"; shift 2 ;;
       --tool)             cli_tool="$2"; shift 2 ;;
-      --ide)              ide="$2"; shift 2 ;;
       --config)           custom_config="$2"; shift 2 ;;
-      --spawn-mode)       spawn_mode="$2"; shift 2 ;;
       --no-symlink-layer) symlink_layer_override=0; shift ;;
-      --no-spawn)         NO_SPAWN=1; shift ;;
       --print-cd)         PRINT_CD=1; shift ;;
       --dry-run)          DRY_RUN=1; shift ;;
       -*)                 die "unknown flag: $1" ;;
@@ -561,10 +539,6 @@ cmd_workspace_create() {
     WS_SYMLINK_LAYER="$symlink_layer_override"
   fi
 
-  # Resolve spawn mode (CLI > config).
-  local effective_spawn_mode="${spawn_mode:-$WS_SPAWN_MODE}"
-  case "$effective_spawn_mode" in single|tabs) ;; *) die "invalid --spawn-mode '$effective_spawn_mode'" ;; esac
-
   log "Workspace: $WORKSPACE_NAME  feature=$feature  projects=$aliases_csv"
 
   # Pre-flight: validate every selected project.
@@ -586,14 +560,11 @@ cmd_workspace_create() {
       base="$(resolve_base_for_alias "$a" "$workspace_base")"
       log "  [$a] branch=$b base=$base path=${WS_PROJECT_PATHS[$a]}/.worktrees/$b"
     done
-    log "  hub=$hub  spawn=$effective_spawn_mode  symlinkLayer=$WS_SYMLINK_LAYER  rollback=$WS_ROLLBACK"
+    log "  hub=$hub  symlinkLayer=$WS_SYMLINK_LAYER  rollback=$WS_ROLLBACK"
     return 0
   fi
 
   ensure_workspace_local_excludes
-
-  local resolved_tool
-  resolved_tool="$(detect_ai_tool "$cli_tool")"
 
   run_ws_hook preCreateAll \
     "FEATURE=$feature" "PROJECTS=$aliases_csv" \
@@ -605,7 +576,7 @@ cmd_workspace_create() {
   for a in "${aliases_arr[@]}"; do
     b="$(resolve_branch_for_alias "$a" "$feature")"
     base="$(resolve_base_for_alias "$a" "$workspace_base")"
-    if line="$(ws_create_one_project "$a" "$b" "$base" "$resolved_tool" "$custom_config")"; then
+    if line="$(ws_create_one_project "$a" "$b" "$base" "$cli_tool" "$custom_config")"; then
       records+="$line"$'\n'
     else
       ok=0
@@ -620,28 +591,19 @@ cmd_workspace_create() {
       die "workspace create rolled back ($WS_ROLLBACK)"
     else
       warn "workspace create failed; left partial state in place ($WS_ROLLBACK)"
-      ws_meta_write "$feature" "$resolved_tool" "$records" || true
+      ws_meta_write "$feature" "$cli_tool" "$records" || true
       exit 1
     fi
   fi
 
   ws_build_symlink_hub "$feature" "$records"
-  ws_meta_write "$feature" "$resolved_tool" "$records"
+  ws_meta_write "$feature" "$cli_tool" "$records"
 
   run_ws_hook postCreateAll \
     "FEATURE=$feature" "PROJECTS=$aliases_csv" \
     "WORKSPACE_ROOT=$WORKSPACE_ROOT" "WORKTREE_ROOT_DIR=$hub"
 
-  log ""
-  log "Workspace feature ready: $feature"
-  log "  hub: $hub"
-  print_cd_hint "$hub"
-
-  if [[ -n "$ide" ]]; then
-    spawn_ide "$hub" "$ide"
-  else
-    spawn_terminal_workspace "$hub" "$feature" "$effective_spawn_mode" "$records" "$cli_tool"
-  fi
+  print_workspace_cd_block "$feature" "$hub" "$records" "$cli_tool"
 }
 
 # Resolve a per-project worktreePath from metadata (which stores it as ./api/.worktrees/...)

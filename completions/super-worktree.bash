@@ -26,12 +26,10 @@ _super_worktree() {
       create)
         case "$prev" in
           --tool)        COMPREPLY=( $(compgen -W "claude opencode codex cursor cline windsurf aider" -- "$cur") ) ;;
-          --ide)         COMPREPLY=( $(compgen -W "code cursor windsurf idea webstorm pycharm zed subl nvim vim" -- "$cur") ) ;;
-          --spawn-mode)  COMPREPLY=( $(compgen -W "single tabs" -- "$cur") ) ;;
           --config)      COMPREPLY=( $(compgen -f -- "$cur") ) ;;
           *)
             # shellcheck disable=SC2207
-            COMPREPLY=( $(compgen -W "--projects --all --base --per-project-base --branch --branch-override --ticket --slug --tool --ide --config --spawn-mode --no-symlink-layer --no-spawn --print-cd --dry-run" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--projects --all --base --per-project-base --branch --branch-override --ticket --slug --tool --config --no-symlink-layer --print-cd --dry-run" -- "$cur") )
             ;;
         esac
         ;;
@@ -61,11 +59,10 @@ _super_worktree() {
     create)
       case "$prev" in
         --tool)    COMPREPLY=( $(compgen -W "claude opencode codex cursor cline windsurf aider" -- "$cur") ) ;;
-        --ide)     COMPREPLY=( $(compgen -W "code cursor windsurf idea webstorm pycharm zed subl nvim vim" -- "$cur") ) ;;
         --config)  COMPREPLY=( $(compgen -f -- "$cur") ) ;;
         *)
           # shellcheck disable=SC2207
-          COMPREPLY=( $(compgen -W "--config --tool --ide --ticket --slug --from-pr --no-spawn --print-cd --dry-run --projects --all --base --branch --branch-override --per-project-base --spawn-mode --no-symlink-layer" -- "$cur") )
+          COMPREPLY=( $(compgen -W "--config --tool --ticket --slug --from-pr --print-cd --dry-run --projects --all --base --branch --branch-override --per-project-base --no-symlink-layer" -- "$cur") )
           ;;
       esac
       ;;

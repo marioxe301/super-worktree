@@ -2,7 +2,7 @@
 # util.sh - shared helpers for super-worktree
 # shellcheck disable=SC2034
 
-SUPER_WORKTREE_VERSION="0.3.0"
+SUPER_WORKTREE_VERSION="0.4.0"
 
 log()  { printf '%s\n' "$*"; }
 warn() { printf 'Warning: %s\n' "$*" >&2; }
@@ -17,17 +17,6 @@ require_cmd() {
     [[ -n "$hint" ]] && err "$hint"
     exit 1
   fi
-}
-
-# Detached background launch — survives parent process exit.
-# Falls back to nohup-disown on systems without setsid.
-detach_run() {
-  if command -v setsid &>/dev/null; then
-    setsid nohup "$@" >/dev/null 2>&1 < /dev/null &
-  else
-    nohup "$@" >/dev/null 2>&1 < /dev/null &
-  fi
-  disown 2>/dev/null || true
 }
 
 validate_branch_name() {
@@ -59,14 +48,42 @@ run_hook() {
 }
 
 print_cd_hint() {
-  local path="$1"
+  local path="$1" tool="${2:-}"
   if [[ "${PRINT_CD:-0}" == "1" ]]; then
-    printf 'cd %q\n' "$path"
+    if [[ -n "$tool" ]]; then
+      printf 'cd %q && %s\n' "$path" "$tool"
+    else
+      printf 'cd %q\n' "$path"
+    fi
     return
   fi
   log ""
   log "========================================"
-  log "Worktree ready at: $path"
-  log "  cd $path"
+  log "Worktree ready: $path"
+  if [[ -n "$tool" ]]; then
+    log "  cd $path && $tool"
+  else
+    log "  cd $path"
+  fi
+  log "========================================"
+}
+
+# Workspace hub + per-project cd hints. Records is newline-separated alias|branch|base|wpath.
+print_workspace_cd_block() {
+  local feature="$1" hub="$2" records="$3" tool="${4:-}"
+  if [[ "${PRINT_CD:-0}" == "1" ]]; then
+    printf 'cd %q\n' "$hub"
+    return
+  fi
+  log ""
+  log "========================================"
+  log "Workspace feature ready: $feature"
+  log "  cd $hub        # hub (symlinks to all projects)"
+  local alias branch base wpath suffix=""
+  [[ -n "$tool" ]] && suffix=" && $tool"
+  while IFS='|' read -r alias branch base wpath; do
+    [[ -z "$alias" ]] && continue
+    log "  cd $wpath${suffix}        # $alias"
+  done <<< "$records"
   log "========================================"
 }

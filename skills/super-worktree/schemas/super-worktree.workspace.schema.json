@@ -66,12 +66,6 @@
           "type": "string",
           "description": "Template for branch name. Supports {ticket}, {slug}, {feature} placeholders."
         },
-        "spawnMode": {
-          "type": "string",
-          "enum": ["single", "tabs"],
-          "default": "single",
-          "description": "single = one tab at workspace-feature root with symlinks; tabs = N tabs (one per project)."
-        },
         "symlinkLayer": {
           "type": "boolean",
           "default": true,

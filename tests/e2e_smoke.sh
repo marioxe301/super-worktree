@@ -15,7 +15,9 @@ trap 'rm -rf "$TMP"' EXIT
   printf 'FOO=bar\n' > .env
 
   echo "==> create testing-branch"
-  NO_SPAWN=1 bash "$SCRIPT" create testing-branch
+  out="$(bash "$SCRIPT" create testing-branch)"
+  printf '%s\n' "$out"
+  echo "$out" | grep -q "cd $TMP/.worktrees/testing-branch" || { echo "missing cd hint in output"; exit 1; }
 
   echo "==> list"
   bash "$SCRIPT" list
