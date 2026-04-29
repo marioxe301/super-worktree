@@ -274,32 +274,76 @@ bash scripts/worktree-manager.sh workspace prune
 
 ## Natural language usage
 
-Invoke via natural language prompts to your AI agent:
+The skill auto-triggers when your AI agent sees prompts about parallel branches, worktrees, multi-repo features, or env-file syncing. You don't need to remember flag names — describe the intent.
+
+### Trigger phrasing
+
+Any of these patterns will route the agent into super-worktree:
+
+- "create / spin up / set up / start a worktree for X"
+- "work on X in parallel without touching my current branch"
+- "I need to work on api and ui at the same time for feature X"
+- "coordinate a feature branch across multiple repos"
+- "open feature X in a new terminal / new tab / cursor / VS Code"
+- "delete / merge / sync / list worktrees"
+- "show me dirty worktrees / which projects have changes"
+- "tear down feature X across all projects"
+- "init a workspace here / scan this folder for repos"
+
+### Single-repo
 
 **Create:**
 - "Create a worktree for feature/login"
 - "Set up a hotfix worktree from production"
 - "Start work on TEST-1 with slug 'test feature'"
+- "Spin up a worktree for the PR I'm reviewing — gh PR 1234"
+- "I want to try a refactor in parallel without leaving this branch"
 
-**Delete / sync:**
+**Delete / sync / list:**
 - "Delete the payments worktree"
 - "Re-sync env files into the login worktree"
+- "List my worktrees / show me which ones are dirty"
+- "Merge feature/login back into main and clean up the worktree"
 
-**With specific tools:**
+**With specific tools / IDEs:**
 - "Create a worktree and open it in cursor"
 - "Open feature/ui in VS Code instead"
+- "Spin up feat/x in a fresh kitty window"
+- "Open this in claude / opencode / codex"
 
-**Workspace (multi-repo):**
+### Workspace (multi-repo)
+
+**Init / discovery:**
 - "Initialize a workspace at this folder so I can work across api, ui, and db"
+- "Scan this directory for git repos and set up a workspace"
+- "I have api/, ui/, db/ as siblings — make this a workspace"
+
+**Coordinated create:**
 - "Spin up coordinated worktrees for feat/payments across api and ui"
+- "Start work on feat/checkout in every project"
 - "Start TEST-42 with slug 'rate limiter' across all projects"
 - "Create feat/checkout in api from main and ui from develop"
-- "Show me which workspace projects are dirty for feat/payments"
+- "I need to touch api and ui together for the new auth flow"
+- "Open feat/payments in tabs mode so I get one terminal per repo"
+- "Create feat/db-only just in db, skip the rest"
+
+**Status / sync / teardown:**
+- "Which workspace projects are dirty for feat/payments?"
+- "Show me status across all projects in feat/x"
 - "Sync env files across every project in feat/payments after I rotated secrets"
 - "Tear down feat/payments — force it even if any project is dirty"
 - "Merge feat/payments into upstream in each project and clean up"
-- "Open feat/payments in tabs mode so I get one terminal per repo"
-- "Create feat/db-only just in db, skip the rest"
+- "Prune any orphan workspace metadata"
+
+**Routing examples (what the agent picks):**
+
+| You say | Agent runs |
+|---------|------------|
+| "Start TEST-1 in api and ui" | `workspace create test-1 --projects api,ui` |
+| "Same feature, but pick the base branch separately for ui" | `workspace create test-1 --projects api,ui --per-project-base ui=develop` |
+| "Open it in cursor when ready" | adds `--ide cursor` (or `--tool` for AI agents) |
+| "Force delete feat/x across everything" | `workspace delete feat/x --force-all` |
+| "Dump status as JSON for my dashboard" | `workspace status feat/x --json` |
 
 ## Shell completions
 
