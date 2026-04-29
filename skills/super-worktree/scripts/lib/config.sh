@@ -115,11 +115,14 @@ _load_one() {
   _merge_jq_hooks  "$file"
 }
 
-# Loads in order: defaults → global → project → custom (later wins).
+# Loads in order: defaults → global → workspace → project → custom (later wins).
+# Workspace-level sync block (in super-worktree.workspace.json) acts as a shared
+# default for every project so users don't need a per-repo .super-worktree.json.
 load_config() {
   local custom="${1:-}"
   _default_config
   _load_one "$HOME/.config/super-worktree/config.json"
+  [[ -n "${WORKSPACE_CONFIG:-}" ]] && _load_one "$WORKSPACE_CONFIG"
   _load_one "$GIT_ROOT/.super-worktree.json"
   _load_one "$GIT_ROOT/super-worktree.json"
   [[ -n "$custom" ]] && _load_one "$custom"

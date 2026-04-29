@@ -97,6 +97,8 @@ bash scripts/worktree-manager.sh workspace delete feat/payments
 | `workspace.hooks.preDeleteAll` | Runs once before delete. |
 | `workspace.hooks.postDeleteAll` | Runs once after delete. |
 
+The top-level `sync` block (same shape as single-mode `super-worktree.json`) acts as a workspace-wide default — every project inherits its `copyFiles`/`symlinkDirs`/`exclude`/`copyDepth`. Per-project `<project>/.super-worktree.json` still wins where it overrides. By default (no workspace `sync` block), each project gets the standard `.env`/credentials copyFiles + `node_modules` symlinkDirs.
+
 ## CLI
 
 | Command | Effect |
