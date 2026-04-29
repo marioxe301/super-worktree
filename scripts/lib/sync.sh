@@ -66,7 +66,7 @@ copy_sensitive_files() {
       copied=$((copied+1))
 
       case "$relpath" in
-        *.env*|*.envrc|*credentials*|*auth*|*secret*|*.key|*.pem)
+        *.env*|*credentials*|*auth*|*secret*|*.key|*.pem)
           secrets_seen=$((secrets_seen+1)) ;;
       esac
     done < <(find "$GIT_ROOT" -maxdepth "$COPY_DEPTH" -name "$pattern" -type f -not -path '*/.git/*' -print0 2>/dev/null)

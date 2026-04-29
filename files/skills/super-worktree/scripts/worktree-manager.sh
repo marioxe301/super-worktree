@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # super-worktree - git worktree manager with env file copying and node_modules
 # symlinking. Prints a copy-pasteable cd hint after create.
+# shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -463,13 +464,13 @@ cmd_workspace() {
 }
 
 cmd_workspace_init() {
-  local target="$PWD" name="" force=0 auto_discover=0
+  local target="$PWD" name="" force=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --name) name="$2"; shift 2 ;;
       --target) target="$2"; shift 2 ;;
       --force) force=1; shift ;;
-      --auto-discover) auto_discover=1; shift ;;
+      --auto-discover) shift ;;  # always-on; accepted for backward compat
       *) die "unknown flag: $1" ;;
     esac
   done

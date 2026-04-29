@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # workspace.sh - multi-repo workspace detection and config loader.
 # Sources util.sh for log/warn/die.
+# shellcheck disable=SC2034
+# WS_* globals are consumed by worktree-manager.sh; shellcheck cannot follow `source`.
 # Populates globals when in workspace mode:
 #   WORKSPACE_MODE         - 1 if a workspace was detected, 0 otherwise
 #   WORKSPACE_ROOT         - absolute path to dir containing super-worktree.workspace.json

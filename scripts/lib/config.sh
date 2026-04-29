@@ -2,6 +2,8 @@
 # config.sh - configuration loader for super-worktree
 # Sources util.sh for log/warn/die.
 # Populates globals: COPY_FILES, SYMLINK_DIRS, EXCLUDE, HOOKS, COPY_DEPTH
+# shellcheck disable=SC2034
+# Globals are consumed by sync.sh + worktree-manager.sh; shellcheck cannot follow.
 
 declare -ga COPY_FILES=()
 declare -ga COPY_NEGATE=()
