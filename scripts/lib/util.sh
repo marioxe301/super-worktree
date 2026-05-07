@@ -2,7 +2,7 @@
 # util.sh - shared helpers for super-worktree
 # shellcheck disable=SC2034
 
-SUPER_WORKTREE_VERSION="0.4.0"
+SUPER_WORKTREE_VERSION="0.5.0"
 
 log()  { printf '%s\n' "$*"; }
 warn() { printf 'Warning: %s\n' "$*" >&2; }
@@ -68,22 +68,4 @@ print_cd_hint() {
   log "========================================"
 }
 
-# Workspace hub + per-project cd hints. Records is newline-separated alias|branch|base|wpath.
-print_workspace_cd_block() {
-  local feature="$1" hub="$2" records="$3" tool="${4:-}"
-  if [[ "${PRINT_CD:-0}" == "1" ]]; then
-    printf 'cd %q\n' "$hub"
-    return
-  fi
-  log ""
-  log "========================================"
-  log "Workspace feature ready: $feature"
-  log "  cd $hub        # hub (symlinks to all projects)"
-  local alias branch base wpath suffix=""
-  [[ -n "$tool" ]] && suffix=" && $tool"
-  while IFS='|' read -r alias branch base wpath; do
-    [[ -z "$alias" ]] && continue
-    log "  cd $wpath${suffix}        # $alias"
-  done <<< "$records"
-  log "========================================"
-}
+

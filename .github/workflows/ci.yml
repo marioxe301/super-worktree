@@ -27,7 +27,7 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update -y && sudo apt-get install -y shellcheck jq
       - name: Run shellcheck
-        run: shellcheck -x scripts/worktree-manager.sh scripts/lib/*.sh tests/*.sh tests/fixtures/*.sh
+        run: shellcheck -x scripts/worktree-manager.sh scripts/lib/*.sh tests/*.sh
 
   e2e:
     runs-on: ubuntu-latest
@@ -44,5 +44,3 @@ jobs:
         run: bash tests/e2e_smoke.sh
       - name: Run single-repo features
         run: bash tests/e2e_features.sh
-      - name: Run workspace e2e
-        run: bash tests/e2e_workspace.sh

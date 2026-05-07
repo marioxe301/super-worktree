@@ -3,7 +3,7 @@
 # Place in fpath, e.g. /usr/local/share/zsh/site-functions/
 
 _super_worktree() {
-  local -a commands ws_subs
+  local -a commands
   commands=(
     'create:create a new worktree'
     'delete:remove a worktree'
@@ -12,64 +12,12 @@ _super_worktree() {
     'list:list all worktrees'
     'status:show clean/dirty per worktree'
     'prune:remove orphaned metadata'
-    'workspace:multi-repo workspace commands'
     'version:print version'
     'help:show usage'
-  )
-  ws_subs=(
-    'init:generate workspace config from auto-discovery'
-    'list:list workspace projects + features'
-    'create:create coordinated worktrees'
-    'status:per-project clean/dirty for a feature'
-    'sync:re-pull env and re-symlink across all projects'
-    'delete:remove a feature across all projects'
-    'merge:merge each project branch into upstream'
-    'prune:remove orphan workspace metadata'
   )
 
   if (( CURRENT == 2 )); then
     _describe 'command' commands
-    return
-  fi
-
-  if [[ "${words[2]}" == "workspace" ]]; then
-    if (( CURRENT == 3 )); then
-      _describe 'workspace subcommand' ws_subs
-      return
-    fi
-    case "${words[3]}" in
-      create)
-        _arguments \
-          '--projects[csv aliases]:projects' \
-          '--all[all declared projects]' \
-          '--base[workspace-wide base ref]:ref' \
-          '--per-project-base[per-project base map]:map' \
-          '--branch[explicit branch name]:branch' \
-          '--branch-override[per-project branch map]:map' \
-          '--ticket[ticket id]:ticket' \
-          '--slug[slug text]:slug' \
-          '--tool[AI tool name appended to printed cd hint]:tool:(claude opencode codex cursor cline windsurf aider)' \
-          '--config[per-project sync overrides]:file:_files' \
-          '--no-symlink-layer[skip symlink hub]' \
-          '--print-cd[print cd line]' \
-          '--dry-run[no changes]'
-        ;;
-      list|status)
-        _arguments '--json[machine-readable output]'
-        ;;
-      delete)
-        _arguments \
-          '--force[delete despite dirty in some projects]' \
-          '--force-all[delete even when all projects dirty]'
-        ;;
-      init)
-        _arguments \
-          '--auto-discover[scan for git repos]' \
-          '--name[workspace name]:name' \
-          '--target[target dir]:dir:_files -/' \
-          '--force[overwrite existing config]'
-        ;;
-    esac
     return
   fi
 
@@ -85,14 +33,8 @@ _super_worktree() {
         '--tool[AI tool name appended to printed cd hint]:tool:(claude opencode codex cursor cline windsurf aider)' \
         '--ticket[ticket id]:ticket' \
         '--slug[slug text]:slug' \
-        '--from-pr[checkout a PR]:pr-number' \
-        '--projects[workspace project aliases (csv)]:projects' \
-        '--all[all declared projects]' \
-        '--base[base ref]:ref' \
-        '--branch[explicit branch name]:branch' \
-        '--per-project-base[per-project base map]:map' \
-        '--branch-override[per-project branch map]:map' \
-        '--no-symlink-layer[skip symlink hub]' \
+        '--from-pr[checkout a GitHub PR]:pr-number' \
+        '--from-mr[checkout a GitLab MR]:mr-number' \
         '--print-cd[print cd line]' \
         '--dry-run[no changes]'
       ;;
